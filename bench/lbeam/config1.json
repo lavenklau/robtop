@@ -1,0 +1,24 @@
+{
+    "model":"Lbeam.obj",
+    "fixedarea":[
+	    {
+	    	"type":"halfspace",
+		"p1":[0,0,36.8],
+		"p2":[1,0,36.8],
+		"p3":[0,1,36.8]
+	    }
+    ],
+    "force":[ ],
+    "loadarea":[
+        {
+            "type":"sphere",
+	    "center":[33,-0.588239,9.41356],
+	    "radius":4
+        },
+	{
+		"type":"sphere",
+		"center":[22.1359,-0.588239,20],
+		"radius":4
+	}
+    ]
+}

@@ -1,0 +1,13 @@
+{
+    "model":"bunnysmooth.obj",
+    "loadarea":[
+        {
+            "type":"sphere",
+            "center":[-0.052219,0.153466,0.011635],
+            "radius":1000
+        }
+    ],
+    "fixedarea":[ ],
+    "force":[
+    ]
+}
