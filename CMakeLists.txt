@@ -131,7 +131,7 @@ target_compile_options(cuLib PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
 	--std=c++17
 	--expt-relaxed-constexpr
 	--compile
-	-gencode arch=compute_52,code=sm_52
+	-gencode arch=compute_60,code=sm_60
 	>)
 target_link_libraries(cuLib PUBLIC glm::glm)
 target_link_libraries(cuLib PRIVATE ${CUDA_LIBRARIES})
