@@ -1,13 +1,10 @@
-FROM nvidia/cuda:11.4.2-ubuntu20.04
+FROM nvidia/cuda:11.4.2-devel-ubuntu20.04
 
-RUN apt-get update
-RUN apt-get install git cmake cuda-toolkit-11-4 libeigen3-dev libgl1-mesa-dev libglu1-mesa-dev libxi-dev libgflags-dev wget libboost-iostreas-dev libtbb-dev libblosc-dev libcgal-dev
+RUN apt-get update && apt-get install git cmake libeigen3-dev libgl1-mesa-dev libglu1-mesa-dev libxi-dev libgflags-dev wget libboost-iostreas-dev libtbb-dev libblosc-dev libcgal-dev
 
 # download source
 RUN cd /home && mkdir src && cd src
-RUN cd /home/src
-RUN git clone https://github.com/lavenklau/robtop.git
-RUN cd ./robtop
+RUN git clone https://github.com/lavenklau/robtop.git && cd ./robtop
 RUN set $srcdir=`pwd`
 
 # install openmesh
@@ -18,6 +15,7 @@ RUN cd $srcdir
 RUN git clone https://github.com/Forceflow/trimesh2.git && cd trimesh2 && make -j4
 
 # download spectra
+RUN cd $srcdir
 RUN git clone https://github.com/yixuan/spectra.git
 
 # install openvdb
