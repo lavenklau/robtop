@@ -123,7 +123,7 @@ target_include_directories(robtop PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIE
 add_library(cuLib STATIC ${CU_LIST})
 set_target_properties(cuLib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(cuLib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-#set_target_properties(cuLib PROPERTIES CUDA_ARCHITECTURES all)
+set_target_properties(cuLib PROPERTIES CUDA_ARCHITECTURES all)
 # set_target_properties(cuLib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_options(cuLib PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
 	--relocatable-device-code=true
@@ -131,7 +131,7 @@ target_compile_options(cuLib PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
 	--std=c++17
 	--expt-relaxed-constexpr
 	--compile
-	-gencode arch=compute_60,code=sm_60
+    #	-gencode arch=compute_60,code=sm_60
 	>)
 target_link_libraries(cuLib PUBLIC glm::glm)
 target_link_libraries(cuLib PRIVATE ${CUDA_LIBRARIES})
