@@ -15,8 +15,9 @@ enable_language(CUDA)
 
 add_definitions(-w)
 
-set(USE_CONDA OFF CACHE BOOL "in conda environment?")
+option(USE_CONDA "in conda environment?" OFF)
 if(USE_CONDA)
+message(STATUS "using conda environment $ENV{CONDA_PREFIX}")
 set(PACKAGE_PREFIX $ENV{CONDA_PREFIX})
 else()
 set(PACKAGE_PREFIX "/home/zhd9702/miniconda3/envs/robtop")

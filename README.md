@@ -1,14 +1,26 @@
 # Large-Scale Worst-Case Topology Optimization
 
+
+
 ## Compilation
 
-The source can be compiled using CMake.
+The source can be compiled using CMake, while most of the dependcies has be packed into a conda environment. You can activate it by :
 
-> Note: the program is only tested on x64 system. When choosing  Visual Studio as generator on Windows, please set  the optional platform as `x64` and toolset as `host=x64`, e.g.,
->
-> ```cmd
-> cmake .. -G "Visual Studio 15 2017" -A x64 -Thost=x64
-> ```
+```bash
+conda env create -f environment.yml
+conda activate robtop
+```
+
+Then configure and build the project in conda environment:
+
+```bash
+mkdir build
+cd buld
+cmake .. -DUSE_CONDA=ON 
+make -j4
+```
+
+
 
 
 
@@ -56,9 +68,10 @@ The source can be compiled using CMake.
 
      ```
      ./robtop -jsonfile=./mirbridge/config2.json -meshfile=./mirbridge/mirbridge.obj -outdir=./result/mirbridge/rob/ -power_penalty=3 -volume_ratio=0.4 -filter_radius=2 -gridreso=511 -damp_ratio=0.5 -shell_width=0 -workmode=wscf -design_step=0.06 -poisson_ratio=0.4 -vol_reduction=0.05 -min_density=1e-3 -logdensity -nologcompliance -testname=None
+     
      ```
-
-     ##### 
+     
+     
 
 
 
@@ -105,7 +118,12 @@ The source can be compiled using CMake.
 
 
 
+## Note 
+
+To see our original source of paper "[Large-Scale Worst-Cast Topology Optimization](https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.14698)", Please checkout tag `CGF-Paper-Version` . The source tree has been refactored.
+
+
+
 ## Reference
 
-* The voxelization routine does credit to [cuda_voxelizer](https://github.com/Forceflow/cuda_voxelizer).
-
+* This repository incorporates a voxelization routine that credits the original source, [cuda_voxelizer](https://github.com/Forceflow/cuda_voxelizer).
