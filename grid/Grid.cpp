@@ -452,6 +452,265 @@ void grid::HierarchyGrid::genFromMesh(const std::vector<float>& pcoords, const s
 
 }
 
+void grid::HierarchyGrid::genFromMesh(const std::vector<unsigned int> &solid_bit, int out_reso[3])
+{
+	float out_box[2][3];
+	for (int i = 0; i < 3; i++) {
+		out_box[0][i] = 0;
+		out_box[1][i] = out_reso[i];
+	}
+	std::vector<unsigned int> inci_vbit;
+
+	int nfineelements = out_reso[0] * out_reso[1] * out_reso[2];
+	
+	int vreso[3] = { out_reso[0] + 1,out_reso[1] + 1,out_reso[2] + 1 };
+
+	int nfinevertices = vreso[0] * vreso[1] * vreso[2];
+
+	//size_t inci_vsize = nfinevertices / (sizeof(unsigned int) * 8) + 1;
+	size_t inci_vsize = snippet::Round<BitCount<unsigned int>::value>(nfinevertices) / BitCount<unsigned int>::value;
+
+	//cubeGridSetSolidVertices(out_reso[0], solid_bit, inci_vbit);
+	cubeGridSetSolidVertices_g(out_reso[0], solid_bit, inci_vbit);
+
+	//array2ConnectedMatlab("solid_vbits", inci_vbit.data(), inci_vbit.size());
+
+	int reso = out_reso[0];
+
+	_nlayer = 1;
+	
+	elesatlist.emplace_back(std::move(solid_bit));
+	vrtsatlist.emplace_back(std::move(inci_vbit));
+	std::vector<int> resolist;
+	resolist.emplace_back(reso);
+
+	// set coarse layers solid bits
+	while (elesatlist.rbegin()->total() > 400) {
+		int finereso = reso;
+		int finereso2 = pow(reso, 2);
+		std::vector<unsigned int>& fine_ebit = elesatlist.rbegin()->_bitArray;
+		std::vector<unsigned int>& fine_vbit = vrtsatlist.rbegin()->_bitArray;
+		reso >>= 1;
+		resolist.emplace_back(reso);
+		size_t reso2 = pow(reso, 2);
+		_nlayer++;
+		std::vector<unsigned int> coarse_bit;
+		std::vector<unsigned int> coarse_vbit;
+		int nCoarseElements = pow(reso, 3);
+		int nCoarseVertices = pow(reso + 1, 3);
+		coarse_bit.resize(snippet::Round<BitCount<unsigned int>::value>(nCoarseElements) / BitCount<unsigned int>::value, 0);
+		coarse_vbit.resize(snippet::Round<BitCount<unsigned int>::value>(nCoarseVertices) / BitCount<unsigned int>::value, 0);
+
+		setSolidElementFromFineGrid_g(finereso, fine_ebit, coarse_bit);
+
+		cubeGridSetSolidVertices_g(reso, coarse_bit, coarse_vbit);
+
+		elesatlist.emplace_back(std::move(coarse_bit));
+		vrtsatlist.emplace_back(std::move(coarse_vbit));
+	}
+
+	printf("-- Building %d layers (%s)\n", elesatlist.size(), (_setting.skiplayer1 ? "Non-dyadic" : "Dyadic"));
+
+	std::vector<std::vector<int>> v2ehost[8];
+	std::vector<std::vector<int>> v2vfinehost[27];
+	std::vector<std::vector<int>> v2vcoarsehost[8];
+	std::vector<std::vector<int>> v2vhost[27];
+	std::vector<std::vector<double>> rxStencilhost[27][9];
+	std::vector<std::vector<int>> vbitflaglist;
+	std::vector<std::vector<int>> ebitflaglist;
+
+	std::vector<int> v2vfinec[64];
+	int* v2vfineclist[64];
+
+
+	// generate topology between elements and vertices
+	for (int i = 0; i < elesatlist.size(); i++) {
+		std::vector<unsigned int>& ebit = elesatlist[i]._bitArray;
+		std::vector<unsigned int>& vbit = vrtsatlist[i]._bitArray;
+		int elementreso = resolist[i];
+		int elementreso2 = pow(elementreso, 2);
+		int vertexreso = elementreso + 1;
+		int vertexreso2 = pow(vertexreso, 2);
+		BitSAT<unsigned int>& elesat = elesatlist[i];
+		BitSAT<unsigned int>& vrtsat = vrtsatlist[i];
+		int nSolidElement = elesat.total();
+		int nSolidVertex = vrtsat.total();
+
+
+		printf("--[%d] total valid vertex %d\n", i, vrtsat.total());
+
+		// allocate buffer
+		for (int k = 0; k < 8; k++) {
+			v2ehost[k].emplace_back(nSolidVertex, -1);
+			v2vcoarsehost[k].emplace_back(nSolidVertex, -1);
+		}
+
+		for (int k = 0; k < 27; k++) {
+			v2vfinehost[k].emplace_back(nSolidVertex, -1);
+			v2vhost[k].emplace_back(nSolidVertex, -1);
+		}
+		
+		vbitflaglist.emplace_back(nSolidVertex, 0);
+		ebitflaglist.emplace_back(nSolidElement, 0);
+
+		// compute flags
+		std::vector<int>& vbitflag = *vbitflaglist.rbegin();
+		std::vector<int>& ebitflag = *ebitflaglist.rbegin();
+
+		// set vertices bit flags
+		Grid::setVerticesPosFlag(vertexreso, vrtsat, vbitflag.data());
+
+		// set elements bit flags
+		for (int j = 0; j < ebit.size(); j++) {
+			
+		}
+
+		// generate v2e
+		while (1) {
+			// only need vertex element topology on first layer
+			if (i != 0) break;
+			int* v2elist[8];
+			for (int j = 0; j < 8; j++) v2elist[j] = v2ehost[j].rbegin()->data();
+			//Grid::setV2E(vertexreso, vrtsat, elesat, v2elist);
+			Grid::setV2E_g(vertexreso, vrtsat, elesat, v2elist);
+			break;
+		}
+
+		// generate v2v
+		int* v2vlist[27];
+		for (int j = 0; j < 27; j++) v2vlist[j] = v2vhost[j].rbegin()->data();
+		//Grid::setV2V(vertexreso, vrtsat, v2vlist);
+		Grid::setV2V_g(vertexreso, vrtsat, v2vlist);
+
+		/// between layers, generate neighbors on different layers
+		// generate v2vcoarse from coarse layer
+		while (1) {
+			if ((_setting.skiplayer1 && i == 1) || i == resolist.size() - 1) break;
+			// v2vfine, v2vcoarse, v2
+			BitSAT<unsigned int>* vrtsatfine = &vrtsatlist[i];
+			BitSAT<unsigned int>* vrtsatcoarse;
+			int vresofine = resolist[i] + 1;
+			int skip = 1;
+			int finelayer = i - 1;
+			if (_setting.skiplayer1 && i == 0) {
+				vrtsatcoarse = &vrtsatlist[i + 2];
+				skip = 2;
+				finelayer = 0;
+			}
+			else {
+				vrtsatcoarse = &vrtsatlist[i + 1];
+			}
+
+			int* v2vcoarse[8];
+			for (int j = 0; j < 8; j++) v2vcoarse[j] = v2vcoarsehost[j].rbegin()->data();
+
+			Grid::setV2VCoarse_g(skip, vresofine, *vrtsatfine, *vrtsatcoarse, v2vcoarse);
+
+			break;
+		}
+
+		// generate v2vfine 
+		while (1) {
+			if (i == 0) break;
+			if (_setting.skiplayer1 && (i == 2 || i == 1)) break;
+			int* v2vfine[27];
+			for (int j = 0; j < 27; j++) v2vfine[j] = v2vfinehost[j].rbegin()->data();
+			BitSAT<unsigned int>& vsatfine = vrtsatlist[i - 1];
+			BitSAT<unsigned int>& vsatcoarse = vrtsatlist[i];
+			int vresocoase = resolist[i] + 1;
+			int vresofine = resolist[i - 1] + 1;
+			Grid::setV2VFine_g(1, vresocoase, vsatfine, vsatcoarse, v2vfine);
+			break;
+		}
+		
+		// generate v2vfinc for non-dyadic layer 2 
+		if (_setting.skiplayer1 && i == 2) {
+			int vresocoarse = resolist[i] + 1;
+			BitSAT<unsigned int>& vsatfine = vrtsatlist[0];
+			BitSAT<unsigned int>& vsatcoarse = vrtsatlist[2];
+			for (int j = 0; j < 64; j++) {
+				v2vfinec[j].resize(vsatcoarse.total());
+				v2vfineclist[j] = v2vfinec[j].data();
+			}
+			Grid::setV2VFineC_g(vresocoarse, vsatfine, vsatcoarse, v2vfineclist);
+		}
+		
+
+	} // finished all layers
+
+	// find shell elements
+	setSolidShellElement(elesatlist[0]._bitArray, elesatlist[0], out_box, resolist[0], ebitflaglist[0]);
+
+
+	// upload grid to device
+	for (int i = 0; i < elesatlist.size(); i++) {
+		auto grd = new Grid();
+
+		if (_setting.skiplayer1&&i == 1) {
+			grd->set_dummy();
+			//_gridlayer.emplace_back(grd);
+		}
+
+		int nv = 0, ne = 0;
+			
+		int* v2e[8] = { nullptr };
+		int* v2vfine[27] = { nullptr };
+		int* v2vcoarse[8] = { nullptr };
+		int* v2v[27] = { nullptr };
+		int* vbitflag = vbitflaglist[i].data();
+		int* ebitflag = ebitflaglist[i].data();
+
+		nv = v2vhost[0][i].size();
+
+		ne = ebitflaglist[i].size();
+
+		// list v2e
+		for (int j = 0; j < 8; j++) {
+			v2e[j] = v2ehost[j][i].data();
+		}
+
+		// list v2vcoarse
+		for (int j = 0; j < 8; j++) {
+			if (i < elesatlist.size() - 1) v2vcoarse[j] = v2vcoarsehost[j][i].data();
+		}
+
+		// list v2v
+		for (int j = 0; j < 27; j++) {
+			v2v[j] = v2vhost[j][i].data();
+		}
+		
+		// select finer grid
+		Grid* finer = nullptr;
+		if (i != 0) {
+			if (_setting.skiplayer1 && i == 2) { finer = _gridlayer[0]; }
+			else { finer = _gridlayer[i - 1]; }
+		}
+
+		// list v2vfine
+		for (int j = 0; j < 27; j++) {
+			if (finer != nullptr) v2vfine[j] = v2vfinehost[j][i].data();
+		}
+
+		
+		if (_setting.skiplayer1) grd->set_skip();
+
+		grd->_inFixedArea = _inFixedArea;
+		grd->_inLoadArea = _inLoadArea;
+		grd->_loadField = _loadField;
+
+		for (int i = 0; i < 6; i++) {
+			(&grd->_box[0][0])[i] = (&out_box[0][0])[i];
+		}
+
+		grd->build(get_gmem(), vrtsatlist[i], elesatlist[i], finer, resolist[i] + 1, i, nv, ne, v2e, v2vfine, v2vcoarse, v2v, v2vfineclist, vbitflag, ebitflag);
+
+		if (i == elesatlist.size() - 1) grd->getV2V();
+
+		_gridlayer.emplace_back(grd);
+	}
+
+}
+
 void HierarchyGrid::writeSupportForce(const std::string& filename)
 {
 	double* fs[3];

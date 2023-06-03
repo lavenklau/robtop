@@ -3,7 +3,7 @@
 */
 
 #include "voxelize.cuh"
-#include "../cudaCommon.cuh"
+#include "cudaCommon.cuh"
 
 #ifdef _DEBUG
 __device__ size_t debug_d_n_voxels_marked = 0;

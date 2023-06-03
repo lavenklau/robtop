@@ -1115,9 +1115,9 @@ void TestSuit::testDistributeForceOpt(void)
 
 void TestSuit::extractMeshFromDensity(void)
 {
-	std::vector<openvdb::Vec3f> vertices;
-	std::vector<openvdb::Vec3I> trias;
-	std::vector<openvdb::Vec4I> quads;
+	std::vector<glm::vec3> vertices;
+	std::vector<glm::vec<3, int>> trias;
+	std::vector<glm::vec<4, int>> quads;
 	openvdb_wrapper_t<float>::meshFromFile(FLAGS_inputdensity, vertices, trias, quads, 0.5, true);
 }
 

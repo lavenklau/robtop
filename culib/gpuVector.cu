@@ -419,18 +419,18 @@ namespace gv {
 
 #endif
 
-	gVector::Scalar gVector::sum(void) const
+	Scalar gVector::sum(void) const
 	{
 		//gVector tmp((size() + 511) / 512);
 		Scalar res = parallel_sum(data(), buf_vector.data(), size());
 		return res;
 	}
 
-	gVector::Scalar* gVector::begin(void) {
+	Scalar* gVector::begin(void) {
 		return _data;
 	}
 
-	gVector::Scalar* gVector::end(void) {
+	Scalar* gVector::end(void) {
 		return _data + _size;
 	}
 
@@ -465,9 +465,9 @@ namespace gv {
 		cudaDeviceSynchronize();
 		cuda_error_check;
 	}
-	//gVector::Scalar gVector::operator[](int eid) const
+	//Scalar gVector::operator[](int eid) const
 	//{
-	//	gVector::Scalar s;
+	//	Scalar s;
 	//	cudaMemcpy(&s, data() + eid, sizeof(Scalar), cudaMemcpyDeviceToHost);
 	//	cuda_error_check;
 	//	return s;
@@ -478,38 +478,38 @@ namespace gv {
 		clamp(vl.data(), vu.data());
 	}
 
-	const gv::gElementProxy& gElementProxy::operator=(gVector::Scalar val)
+	const gv::gElementProxy& gElementProxy::operator=(Scalar val)
 	{
 #ifdef __DEBUG_GVECTOR
 		std::cout << "proxy assignment is called, val = " << val << std::endl;
 #endif
 		/// DEBUG
 		//cuda_error_check;
-		cudaMemcpy(address, &val, sizeof(gVector::Scalar), cudaMemcpyHostToDevice);
+		cudaMemcpy(address, &val, sizeof(Scalar), cudaMemcpyHostToDevice);
 		/// DEBUG
 		//cuda_error_check;
 		//printf("-- addr = %p,  val = %6.2e\n", address, val);
 		return (*this);
 	}
 
-	gv::gElementProxy::operator gv::gVector::Scalar(void) const {
-		gVector::Scalar val;
+	gv::gElementProxy::operator gv::Scalar(void) const {
+		Scalar val;
 #ifdef __DEBUG_GVECTOR
 		std::cout << "type conversion is called, address = " << address << std::endl;
 #endif
-		cudaMemcpy(&val, address, sizeof(gVector::Scalar), cudaMemcpyDeviceToHost);
+		cudaMemcpy(&val, address, sizeof(Scalar), cudaMemcpyDeviceToHost);
 		return val;
 	}
 
 #ifndef __USE_GVECTOR_LAZY_EVALUATION
-	gv::gVector operator*(gv::gVector::Scalar scale, const gVector& v)
+	gv::gVector operator*(gv::Scalar scale, const gVector& v)
 	{
 		gVector res(v);
 		res *= scale;
 		return res;
 	}
 
-	gv::gVector operator/(gv::gVector::Scalar nom, const gVector& v)
+	gv::gVector operator/(gv::Scalar nom, const gVector& v)
 	{
 		gVector res(v);
 		Scalar* ptr = res.data();
@@ -676,7 +676,7 @@ namespace gv {
 
 #endif
 
-	gv::gVector::Scalar* gv::gVector::get_dump_buf(void)
+	gv::Scalar* gv::gVector::get_dump_buf(void)
 	{
 		return buf_vector.data();
 	}
@@ -696,7 +696,7 @@ namespace gv {
 	}
 
 
-	std::vector<gVector::Scalar> gVector::slice2host(int start, int end) const
+	std::vector<Scalar> gVector::slice2host(int start, int end) const
 	{
 		if (end < start || start < 0 || end >= size()) {
 			throw std::string("invalid indices !");
@@ -707,7 +707,7 @@ namespace gv {
 		return res;
 	}
 
-	gVector::Scalar gVector::dot(const gVector& v2) const
+	Scalar gVector::dot(const gVector& v2) const
 	{
 		//gVector tmp((size() + 511) / 512);
 		return ::dot(data(), v2.data(), buf_vector.data(), size());

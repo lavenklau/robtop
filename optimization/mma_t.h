@@ -27,7 +27,7 @@ namespace MMA {
 
 class mma_subproblem_t {
 public:
-	typedef gv::gVector::Scalar Scalar;
+	typedef gv::Scalar Scalar;
 private:
 	std::vector<gv::gVector*> p;
 	std::vector<gv::gVector*> q;
@@ -48,7 +48,7 @@ private:
 
 	gv::gVector b;
 
-	Eigen::SparseMatrix<gv::gVector::Scalar, Eigen::RowMajor> A;
+	Eigen::SparseMatrix<gv::Scalar, Eigen::RowMajor> A;
 
 	// subproblem line search variable
 	gv::gVector dx;
@@ -90,15 +90,15 @@ private:
 		int* col_ptr = nullptr;
 		// device col pointer
 
-		gv::gVector::Scalar* val_ptr = nullptr;
+		gv::Scalar* val_ptr = nullptr;
 		// device value pointer
 
-		gv::gVector::Scalar* b_ptr = nullptr;
+		gv::Scalar* b_ptr = nullptr;
 		// device right side value pointer
 
 		~cuSolver_t();
 
-		void update(int* hot_row_ptr, int* host_col_ptr, gv::gVector::Scalar* host_val_ptr, gv::gVector::Scalar* host_b_ptr);
+		void update(int* hot_row_ptr, int* host_col_ptr, gv::Scalar* host_val_ptr, gv::Scalar* host_b_ptr);
 
 		void solve(gv::gVector& result);
 
@@ -147,8 +147,8 @@ public:
 		Scalar new_zeta, gv::gVector& new_s, Scalar lambda_damp = 1
 	);
 
-	gv::gVector solveLinearSystem(gv::gVector& Dx, gv::gVector& Dy, std::vector<gv::gVector*>& G, gv::gVector::Scalar zetadz, gv::gVector& a, gv::gVector& Dlambda,
-		gv::gVector& deltax, gv::gVector& deltay, gv::gVector::Scalar deltaz, gv::gVector& deltaLambda);
+	gv::gVector solveLinearSystem(gv::gVector& Dx, gv::gVector& Dy, std::vector<gv::gVector*>& G, gv::Scalar zetadz, gv::gVector& a, gv::gVector& Dlambda,
+		gv::gVector& deltax, gv::gVector& deltay, gv::Scalar deltaz, gv::gVector& deltaLambda);
 
 	void largeVarlessConstrainLinearSolve(std::vector<std::vector<Scalar>>& A11, std::vector<Scalar>& A12, Scalar A13, std::vector<Scalar>& b1, Scalar b2, std::vector<Scalar>& result);
 

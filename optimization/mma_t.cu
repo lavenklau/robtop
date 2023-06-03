@@ -59,8 +59,8 @@ bool MMA::mma_subproblem_t::init(gv::gVector* df, std::vector<gv::gVector*>& dg,
 		int n_elements = n + m + 1 + n * m * 2 + m * 4 + m * m;
 		cudaMalloc(&cuSolver.row_ptr, sizeof(int)*(n + m + 1 + m + 1));
 		cudaMalloc(&cuSolver.col_ptr, sizeof(int)*(n_elements));
-		cudaMalloc(&cuSolver.val_ptr, sizeof(gv::gVector::Scalar)*n_elements);
-		cudaMalloc(&cuSolver.b_ptr, sizeof(gv::gVector::Scalar)*(n + m + 1 + m));
+		cudaMalloc(&cuSolver.val_ptr, sizeof(gv::Scalar)*n_elements);
+		cudaMalloc(&cuSolver.b_ptr, sizeof(gv::Scalar)*(n + m + 1 + m));
 
 		cuSolver.n_nonzeros = n_elements;
 		cuSolver.nrows = n + m + 1 + m;
@@ -111,7 +111,7 @@ bool MMA::mma_subproblem_t::init(gv::gVector* df, std::vector<gv::gVector*>& dg,
 	}
 
 	// compute d
-	//std::vector<gVector::Scalar> dhost(p.size() - 1);
+	//std::vector<Scalar> dhost(p.size() - 1);
 	//for (int i = 0; i < dhost.size(); i++) {
 	//	dhost[i] = (*p[i + 1] / (mma.asym_u - mma.x) + *q[i + 1] / (mma.x - mma.asym_l)).sum();
 	//}
@@ -227,10 +227,10 @@ void mma_t::adjust_asym(gv::gVector& dx0, gv::gVector& dx_1)
 
 gv::gVector MMA::mma_subproblem_t::solveLinearSystem(
 	gv::gVector& Dx, gv::gVector& Dy, std::vector<gv::gVector*>& Gvecs,
-	gv::gVector::Scalar zetadz, gv::gVector& a, 
-	gv::gVector& Dlambda, gv::gVector& deltax, gv::gVector& deltay, gv::gVector::Scalar deltaz, gv::gVector& deltaLambda)
+	gv::Scalar zetadz, gv::gVector& a, 
+	gv::gVector& Dlambda, gv::gVector& deltax, gv::gVector& deltay, gv::Scalar deltaz, gv::gVector& deltaLambda)
 {
-	std::vector<Eigen::Triplet<gv::gVector::Scalar>> triplist;
+	std::vector<Eigen::Triplet<gv::Scalar>> triplist;
 
 	gVector::toMatlab("Gvecs", Gvecs);
 	Dx.toMatlab("Dx");
@@ -327,7 +327,7 @@ gv::gVector MMA::mma_subproblem_t::solveLinearSystem(
 	return dw;
 }
 
-std::pair<gv::gVector::Scalar, gv::gVector::Scalar> MMA::mma_subproblem_t::solve(gv::gVector* df, std::vector<gv::gVector*>& dg, gv::gVector* g, gv::gVector& dxResult)
+std::pair<gv::Scalar, gv::Scalar> MMA::mma_subproblem_t::solve(gv::gVector* df, std::vector<gv::gVector*>& dg, gv::gVector* g, gv::gVector& dxResult)
 {
 	gv::gVector curx = mma.x;
 
@@ -670,12 +670,12 @@ std::pair<Scalar, Scalar> MMA::mma_subproblem_t::kkt_err(
 	return std::pair<Scalar, Scalar>(sqrt(err_sum), err_max);
 }
 
-void MMA::mma_subproblem_t::cuSolver_t::update(int* host_row_ptr, int* host_col_ptr, gv::gVector::Scalar* host_val_ptr, gv::gVector::Scalar* host_b_ptr)
+void MMA::mma_subproblem_t::cuSolver_t::update(int* host_row_ptr, int* host_col_ptr, gv::Scalar* host_val_ptr, gv::Scalar* host_b_ptr)
 {
 	cudaMemcpy(row_ptr, host_row_ptr, sizeof(int)*n_row_indices(), cudaMemcpyHostToDevice);
 	cudaMemcpy(col_ptr, host_col_ptr, sizeof(int)*n_elements(), cudaMemcpyHostToDevice);
-	cudaMemcpy(val_ptr, host_val_ptr, sizeof(gv::gVector::Scalar)*n_elements(), cudaMemcpyHostToDevice);
-	cudaMemcpy(b_ptr, host_b_ptr, sizeof(gv::gVector::Scalar)*nrows, cudaMemcpyHostToDevice);
+	cudaMemcpy(val_ptr, host_val_ptr, sizeof(gv::Scalar)*n_elements(), cudaMemcpyHostToDevice);
+	cudaMemcpy(b_ptr, host_b_ptr, sizeof(gv::Scalar)*nrows, cudaMemcpyHostToDevice);
 }
 
 

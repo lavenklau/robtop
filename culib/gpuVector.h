@@ -56,7 +56,7 @@ class gElementProxy;
 
 class gVector {
 public:
-	typedef Scalar Scalar;
+	// typedef Scalar Scalar;
 private:
 	Scalar* _data;
 	size_t _size;
@@ -401,9 +401,9 @@ public:
 
 #ifndef __USE_GVECTOR_LAZY_EVALUATION
 
-gVector operator*(gVector::Scalar scale, const gVector& v);
+gVector operator*(Scalar scale, const gVector& v);
 
-gVector operator/(gVector::Scalar nom, const gVector& v);
+gVector operator/(Scalar nom, const gVector& v);
 
 #endif
 
@@ -411,7 +411,7 @@ class gVectorMap
 	:public gVector
 {
 public:
-	gVectorMap(gVector::Scalar* data_ptr, size_t size) :gVector(data_ptr, size) {}
+	gVectorMap(Scalar* data_ptr, size_t size) :gVector(data_ptr, size) {}
 	~gVectorMap(void) override;
 	const gVectorMap& operator=(const gVector& v2) const;
 
@@ -427,19 +427,19 @@ public:
 };
 
 class gElementProxy {
-	gVector::Scalar* address;
+	Scalar* address;
 public:
-	explicit gElementProxy(gVector::Scalar* ptr) : address(ptr) {}
+	explicit gElementProxy(Scalar* ptr) : address(ptr) {}
 
-	const gElementProxy& operator=(gVector::Scalar val);
+	const gElementProxy& operator=(Scalar val);
 
-	operator gVector::Scalar(void) const;
+	operator Scalar(void) const;
 };
 
 #if 0
 class gMat {
 private:
-	typedef gVector::Scalar Scalar;
+	typedef Scalar Scalar;
 	Scalar* _ptr = nullptr;
 	int _rows = 0, _cols = 0;
 

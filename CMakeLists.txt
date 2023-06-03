@@ -1,166 +1,160 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.22)
 
 project(LargeScaleRobTop)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_VERBOSE_MAKEFILE ON)
+# set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set (CMAKE_BUILD_TYPE "Release")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
-set(CMAKE_IGNORE_PATH "/mnt/d/Program Files/vcpkg/installed/x64-windows/share/gflags")
-
-message(STATUS "module path ${CMAKE_MODULE_PATH}")
-
-find_package(Eigen3 REQUIRED)
-message(STATUS "Eigen directory ${EIGEN3_INCLUDE_DIRS}")
-
-find_package(glm REQUIRED)
-message(STATUS "glm directory ${GLM_INCLUDE_DIRS}")
-
-#find_package(spectra REQUIRED)
-set(SPECTRA_INCLUDE_DIR "" CACHE STRING "include directory of Spectra")
-set(TRIMESH_INCLUDE_DIR "" CACHE STRING "include directory of trimesh2")
-set(TRIMESH_LIBRARY     "" CACHE STRING "library path to trimesh2")
-
-if ("${TRIMESH_LIBRARY}" STREQUAL "")
-    message(FATAL_ERROR "You should provide a library file of trimesh2 (TRIMESH_LIBRARY)
-    (https://github.com/Forceflow/trimesh2.git)")
-endif()
-
-if ("${TRIMESH_INCLUDE_DIR}" STREQUAL "")
-    message(FATAL_ERROR "You should provide a include directory of trimesh2 (TRIMESH_INCLUDE_DIR)
-    (https://github.com/Forceflow/trimesh2.git)")
-endif()
-
-if ("${SPECTRA_INCLUDE_DIR}" STREQUAL "")
-    message(FATAL_ERROR "Missing Spectra library include directory (SPECTRA_INCLUDE_DIR)
-    (https://github.com/yixuan/spectra.git) ")
-endif()
-
-
-find_package(gflags REQUIRED)
-message(STATUS "gflags dir ${GFLAGS_INCLUDE_DIR}")
-
-find_package(OpenMesh REQUIRED)
-message(STATUS "OpenMesh directory ${OPENMESH_INCLUDE_DIR}")
-
-set (OpenVDB_Module_Path "" CACHE PATH "Directory containing FindOpenVDB.cmake")
-
-LIST ( APPEND CMAKE_MODULE_PATH ${OpenVDB_Module_Path})
-
-find_package(OpenVDB REQUIRED)
-
-find_package(Boost REQUIRED)
-
-find_package(CGAL REQUIRED)
-
-find_package(RapidJSON REQUIRED)
-
-find_package(OpenMP REQUIRED)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+# set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+# set(CMAKE_IGNORE_PATH "/mnt/d/Program Files/vcpkg/installed/x64-windows/share/gflags")
 
 enable_language(CUDA)
 
-find_package(CUDA REQUIRED)
+add_definitions(-w)
 
-# Do what the new package does
-find_library(CUDA_DRIVER_LIBRARY
-             NAMES cuda_driver cuda
-             HINTS ${CUDA_TOOLKIT_ROOT_DIR}
-                   ENV CUDA_PATH
-             PATH_SUFFIXES nvidia/current lib64 lib/x64 lib)
-if (NOT CUDA_DRIVER_LIBRARY)
-    # Don't try any stub directories until we have exhausted all other search locations.
-    find_library(CUDA_DRIVER_LIBRARY
-                 NAMES cuda_driver cuda
-                 HINTS ${CUDA_TOOLKIT_ROOT_DIR}
-                       ENV CUDA_PATH
-                 PATH_SUFFIXES lib64/stubs lib/x64/stubs lib/stubs stubs)
-endif ()
-
-include(CheckLanguage)
-check_language(CUDA)
-
-if(NOT DEFINED CMAKE_CUDA_STANDARD)
-	# set(CMAKE_CUDA_STANDARD 17)
-	set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+set(USE_CONDA OFF CACHE BOOL "in conda environment?")
+if(USE_CONDA)
+set(PACKAGE_PREFIX $ENV{CONDA_PREFIX})
+else()
+set(PACKAGE_PREFIX "/home/zhd9702/miniconda3/envs/robtop")
 endif()
+set(TBB_ROOT ${PACKAGE_PREFIX})
+set(CMAKE_MODULE_PATH ${PACKAGE_PREFIX})
+set(CMAKE_PREFIX_PATH ${PACKAGE_PREFIX})
 
-file(GLOB CPP_LIST "*.cpp")
-file(GLOB CPP_VOX "voxelizer/*.cpp")
-list(APPEND CPP_LIST ${CPP_VOX})
+# disable default path
+# set(CMAKE_FIND_USE_PACKAGE_ROOT_PATH FALSE)
+# set(CMAKE_FIND_USE_CMAKE_PATH FALSE)
+# set(CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH FALSE)
+# set(CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH FALSE)
+# set(CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY FALSE)
+# set(CMAKE_FIND_USE_CMAKE_SYSTEM_PATH FALSE)
+# set(CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY FALSE)
 
-#list(REMOVE_ITEM CPP_LIST "volumerender/volume_renderer.cpp")
-#list(FILTER CPP_LIST EXCLUDE REGEX ".*volume_renderer\\.cpp$")
+#option(DISABLE_CMAKE_SEARCH_PATHS ON)
 
-file(GLOB CU_LIST "*.cu")
-file(GLOB CU_VOX "voxelizer/*.cu")
-list(APPEND CU_LIST ${CU_VOX})
+include(FetchContent)
+include(ExternalProject)
+# Fetch OpenVDB 8.2
+FetchContent_Declare(
+  openvdb
+  URL https://github.com/AcademySoftwareFoundation/openvdb/archive/refs/tags/v8.2.0.tar.gz
+  URL_HASH MD5=2852fe7176071eaa18ab9ccfad5ec403
+)
+FetchContent_MakeAvailable(openvdb)
+message(STATUS "openvdb_SOURCE_DIR = ${openvdb_SOURCE_DIR} ")
+message(STATUS "openvdb_BINARY_DIR = ${openvdb_BINARY_DIR} ")
+
+# Fetch trimesh2
+FetchContent_Declare(
+  trimesh2
+  GIT_REPOSITORY https://github.com/jrock08/Trimesh2.git
+  GIT_TAG 121d33992f83aeb9ec823936b5136f8bf854d6f0
+)
+FetchContent_MakeAvailable(trimesh2)
+# set(trimesh_src_prefix  ${CMAKE_CURRENT_BINARY_DIR}/trimesh2/src/trimesh2)
+# ExternalProject_Add(trimesh2
+#     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/trimesh2
+#     GIT_REPOSITORY https://github.com/Forceflow/trimesh2.git
+#     GIT_TAG 45a78d23942f7d21609895d2ddd9e6043b6b49b3
+#     UPDATE_DISCONNECTED true
+#     CONFIGURE_COMMAND ""
+#     BUILD_COMMAND  make -C ${trimesh_src_prefix} 
+#     BUILD_IN_SOURCE TRUE
+#     INSTALL_COMMAND ""
+#     BUILD_BYPRODUCTS ${trimesh_src_prefix}/lib.Linux64/libtrimesh.a
+# )
+# set(TRIMESH2_INCLUDE_DIR ${trimesh_src_prefix}/include)
+# set(TRIMESH2_LIBRARIES ${trimesh_src_prefix}/lib.Linux64/libtrimesh.a)
+
+
+FetchContent_Declare(
+  spectra
+  GIT_REPOSITORY https://github.com/yixuan/spectra.git
+  GIT_TAG 8c7242e08f0fb7f6a0022cfe232e3dc5b5bd4eb4
+)
+FetchContent_MakeAvailable(spectra)
+
+FetchContent_Declare(
+  OpenMesh
+  GIT_REPOSITORY https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh.git
+  GIT_TAG        OpenMesh-8.1
+)
+FetchContent_MakeAvailable(OpenMesh)
+
+find_package(Eigen3 REQUIRED)
+find_package(glm REQUIRED)
+find_package(gflags REQUIRED)
+find_package(Boost CONFIG REQUIRED)
+find_package(CGAL REQUIRED)
+find_package(RapidJSON REQUIRED)
+find_package(OpenMP REQUIRED)
+find_package(CUDAToolkit REQUIRED)
+
+
+file(GLOB_RECURSE sources *.cpp *.cu *.cc *.c)
+file(GLOB_RECURSE buildCopy build/*.cpp build/*.cu build/*.cc build/*.c)
+list(REMOVE_ITEM sources ${buildCopy})
 
 message(STATUS "found .cpp files ${CPP_LIST}")
 message(STATUS "found .cu  files ${CU_LIST} ")
 message(STATUS "CUDA headers ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ")
 
-#include_directories("${OPENMESH_INCLUDE_DIRS}")
-include_directories("${TRIMESH_INCLUDE_DIR}")
 include_directories("${CMAKE_SOURCE_DIR}")
-include_directories("${CMAKE_SOURCE_DIR}/generated")
+# include_directories("${CMAKE_SOURCE_DIR}/generated")
 include_directories("${CMAKE_SOURCE_DIR}/voxelizer")
+include_directories("${CMAKE_SOURCE_DIR}/grid")
+include_directories("${CMAKE_SOURCE_DIR}/mem")
+include_directories("${CMAKE_SOURCE_DIR}/optimization")
+include_directories("${CMAKE_SOURCE_DIR}/matlab")
+include_directories("${CMAKE_SOURCE_DIR}/culib")
+include_directories("${CMAKE_SOURCE_DIR}/element")
+include_directories("${CMAKE_SOURCE_DIR}/utils")
+include_directories("${CMAKE_SOURCE_DIR}/voxelIO")
+include_directories("${CMAKE_SOURCE_DIR}/boundary")
 include_directories("${CMAKE_SOURCE_DIR}/volumerender/cuda_samples")
-include_directories(${EIGEN3_INCLUDE_DIRS})
 
-add_definitions(-DOM_STATIC_BUILD -D_USE_MATH_DEFINES)
-
-# output include directories
-get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-foreach(dir ${dirs})
-	message(STATUS "dir='${dir}'")
-endforeach()
-add_executable(robtop  ${CPP_LIST})
-
-target_include_directories(robtop PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-
-add_library(cuLib STATIC ${CU_LIST})
-set_target_properties(cuLib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-set_target_properties(cuLib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-set_target_properties(cuLib PROPERTIES CUDA_ARCHITECTURES all)
-# set_target_properties(cuLib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_options(cuLib PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
-	--relocatable-device-code=true
-	--extended-lambda
-	--std=c++17
-	--expt-relaxed-constexpr
-	--compile
-    #	-gencode arch=compute_60,code=sm_60
-	>)
-target_link_libraries(cuLib PUBLIC glm::glm)
-target_link_libraries(cuLib PRIVATE ${CUDA_LIBRARIES})
-target_link_libraries(cuLib PRIVATE ${CUDA_DRIVER_LIBRARY})
-
-
-message(STATUS "CUDA libs ${CUDA_LIBRARIES}")
-message(STATUS "CUDA lib  ${CUDA_DRIVER_LIBRARY}")
-
-target_include_directories(robtop PUBLIC ${Boost_INCLUDE_DIRS})
-target_include_directories(robtop PUBLIC ${GLM_INCLUDE_DIRS})
-target_include_directories(robtop PUBLIC ${CGAL_INCLUDE_DIRS})
+add_executable(robtop  ${sources})
+set_target_properties(robtop PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(robtop PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+set_target_properties(robtop PROPERTIES CUDA_ARCHITECTURES "61;75;86")
+target_compile_options(robtop PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+        --relocatable-device-code=true
+        -dc
+        --extended-lambda
+        --std=c++17
+        --expt-relaxed-constexpr
+        --compile
+        >)
+target_link_libraries(robtop PUBLIC Eigen3::Eigen)
+target_include_directories(robtop PUBLIC CGAL::CGAL)
 target_include_directories(robtop PUBLIC ${RAPIDJSON_INCLUDE_DIRS})
 target_include_directories(robtop PUBLIC ${OPENVDB_INCLUDE_DIRS})
 target_include_directories(robtop PUBLIC ${GFLAGS_INCLUDE_DIR})
 target_include_directories(robtop PUBLIC ${SPECTRA_INCLUDE_DIR})
 target_link_libraries(robtop INTERFACE glm::glm)
-#target_link_libraries(robtop INTERFACE Spectra::Spectra)
-target_link_libraries(robtop PRIVATE cuLib)
-target_link_libraries(robtop PRIVATE OpenVDB::openvdb)
+target_include_directories(robtop PUBLIC ${openvdb_SOURCE_DIR}/openvdb/openvdb)
+target_include_directories(robtop PUBLIC ${openvdb_SOURCE_DIR}/openvdb)
+target_include_directories(robtop PUBLIC ${openvdb_BINARY_DIR}/openvdb/openvdb/openvdb)
+target_link_libraries(robtop PUBLIC openvdb_shared)
 target_link_libraries(robtop PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(robtop PUBLIC OpenMeshCore)
-#target_link_libraries(robtop PRIVATE ${OPENMESH_LIBRARIES})
-target_link_libraries(robtop PRIVATE ${CUDA_LIBRARIES})
-target_link_libraries(robtop PRIVATE ${CUDA_DRIVER_LIBRARY})
-target_link_libraries(robtop PRIVATE ${CUDA_curand_LIBRARY})
-target_link_libraries(robtop PRIVATE ${CUDA_cusolver_LIBRARY})
-target_link_libraries(robtop PRIVATE ${CUDA_cusparse_LIBRARY})
-target_link_libraries(robtop PRIVATE ${CUDA_CUBLAS_LIBRARIES})
 target_link_libraries(robtop PRIVATE ${GFLAGS_LIBRARIES})
 target_link_libraries(robtop PRIVATE ${TRIMESH_LIBRARY})
+target_link_libraries(robtop PUBLIC Spectra)
+target_link_libraries(robtop PUBLIC CUDA::cudart)
+target_link_libraries(robtop PUBLIC CUDA::curand)
+target_link_libraries(robtop PUBLIC CUDA::cusolver)
+target_link_libraries(robtop PUBLIC CUDA::cublas)
+target_link_libraries(robtop PUBLIC CUDA::cusparse)
+target_link_libraries(robtop PUBLIC CUDA::cuda_driver)
+target_include_directories(robtop PUBLIC ${trimesh2_SOURCE_DIR}/include)
+target_link_libraries(robtop PUBLIC trimesh)
+# add_dependencies(robtop trimesh2)
+# target_include_directories(robtop PUBLIC ${TRIMESH2_INCLUDE_DIR})
+#target_link_libraries(robtop PUBLIC ${TRIMESH2_LIBRARIES})
+
 

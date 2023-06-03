@@ -617,6 +617,8 @@ namespace grid {
 
 		void genFromMesh(const std::vector<float>& pcoords, const std::vector<int>& facevertices);
 
+		void genFromMesh(const std::vector<unsigned int> &solid_bit, int out_reso[3]);
+
 		void resetAllResidual(void);
 
 		void restrict_stencil_dyadic(Grid& dstcoarse, Grid& srcfine);
