@@ -168,6 +168,7 @@ namespace grid {
 		}
 	};
 
+	using ScalarT = float;
 
 	class Grid
 	{
@@ -192,6 +193,8 @@ namespace grid {
 	public:
 		friend class HierarchyGrid;
 		std::string _name;
+
+		bool enableHeatGrid = true;
 		struct {
 			float* rho_e;
 			int * v2e[8];
@@ -225,6 +228,14 @@ namespace grid {
 			double* F[3];
 			double* R[3];
 			double* Fsupport[3];
+
+			// for heat
+			ScalarT* uT;
+			ScalarT* fT;
+			ScalarT* rT;
+
+			float* rhoHeat;
+			ScalarT* tStencil[27];
 		} _gbuf;
 
 		int n_vertices = 0;
@@ -275,7 +286,10 @@ namespace grid {
 			offset_supportnodes = 19,
 
 			mask_surfaceelements = 0b100000000000000000000,
-			offset_surfaceelements = 20
+			offset_surfaceelements = 20,
+
+			mask_sink_nodes= 0b1000000000000000000000,
+			offset_sink_nodes = 21
 		};
 
 		int _layer = 0;
@@ -414,13 +428,27 @@ namespace grid {
 
 		void gs_relax(int n_times = 1);
 
+		void gs_relax_heat(int n_times = 1);
+
+		void update_heat_residual(void);
+
+		void heatDiffusionStep(void);
+
 		//void gs_adjoint_relax(int n_times = 1);
 
 		void reset_displacement(void);
 
+		void reset_heat_displacement(void);
+
 		void reset_force(void);
 
+		void reset_heat_force(void);
+
 		void reset_residual(void);
+
+		void reset_heat_residual(void);
+
+		void restrict_heat_residual(void);
 
 		void resetDirchlet(double* v_dev[3]);
 
@@ -432,9 +460,13 @@ namespace grid {
 
 		void prolongate_correction(void);
 
+		void prolongate_heat_correction(void);
+
 		void restrict_residual(void);
 
 		double relative_residual(void);
+
+		double relative_heat_residual(void);
 
 		double residual(void);
 
@@ -623,6 +655,8 @@ namespace grid {
 
 		void restrict_stencil_dyadic(Grid& dstcoarse, Grid& srcfine);
 
+		void restrict_heat_stencil(Grid& dstcoarse, Grid& srcfine);
+
 		void restrict_stencil_nondyadic(Grid& dstcoarse, Grid& srcfine);
 
 		//void restrict_adjoint_stencil_nondyadic(Grid& dstcoarse, Grid& srcfine);
@@ -666,6 +700,8 @@ namespace grid {
 		//void update_adjoint_stencil(void);
 
 		double v_cycle(int pre_relax = 1, int post_relax = 1);
+
+		double v_cycle_heat(int pre_relax = 1, int post_relax = 1);
 
 		double v_halfcycle(int depth, int pre_relax = 1, int post_relax = 1);
 

@@ -5,14 +5,7 @@
 #include <vector>
 
 
-void* _libbuf = nullptr;
-size_t _libbufSize = 0;
-
-__host__ void make_kernel_param(size_t* block_num, size_t* block_size, size_t num_tasks, size_t prefer_block_size) {
-	*block_size = prefer_block_size;
-	*block_num = (num_tasks + prefer_block_size - 1) / prefer_block_size;
-}
-
+namespace culib {
 __host__ void make_kernel_param(dim3& grid_dim, dim3& block_dim, const dim3& num_tasks, int prefer_block_size) {
 	block_dim.x = prefer_block_size;
 	block_dim.y = prefer_block_size;
@@ -22,148 +15,149 @@ __host__ void make_kernel_param(dim3& grid_dim, dim3& block_dim, const dim3& num
 	grid_dim.z = (num_tasks.z + prefer_block_size - 1) / prefer_block_size;
 }
 
-
-double dump_array_sum(float* dump, size_t n) {
-	constexpr int blockSize = 512;
-	double sum;
-	if (n <= 1) {
-		float fsum;
-		cudaMemcpy(&fsum, dump, sizeof(float), cudaMemcpyDeviceToHost);
-		return fsum;
-	}
-
-	double* p_out = reinterpret_cast<double*>(dump);
-	size_t grid_size, block_size;
-	make_kernel_param(&grid_size, &block_size, n, 512);
-	block_sum_kernel<float, 512, double> << <grid_size, block_size >> > (dump, p_out, n);
-
-	n = (n + blockSize - 1) / blockSize;
-
-	while (n > 1) {
-		make_kernel_param(&grid_size, &block_size, n, blockSize);
-		block_sum_kernel << <grid_size, block_size >> > (p_out, p_out, n);
-		n = (n + blockSize - 1) / blockSize;
-	}
-	cudaMemcpy(&sum, p_out, sizeof(double), cudaMemcpyDeviceToHost);
-	return sum;
-}
-
-Scaler array_norm2(Scaler* dev_data/*, Scaler* host_data*/, int n, bool root/* = true*/) {
-	Scaler* tmp_buf, *block_buf;
-	cudaMalloc(&tmp_buf, n * sizeof(Scaler));
-	cudaMalloc(&block_buf, n * sizeof(Scaler));
-	size_t block_dim;
-	size_t grid_dim;
-	make_kernel_param(&grid_dim, &block_dim, n, 512);
-	auto sq = []__device__(Scaler s) { return s * s; };
-	map << <grid_dim, block_dim >> > (dev_data, tmp_buf, n, sq);
-	cudaDeviceSynchronize();
-	cuda_error_check;
-	Scaler sum = array_sum_gpu(tmp_buf, n, block_buf);
-	cudaFree(tmp_buf);
-	cudaFree(block_buf);
-	if (root) {
-		return sqrt(sum);
+TempBuffer::TempBuffer(size_t size, bool unify /*= false*/) : unified(unify), siz(size) {
+	if (!unify) {
+		cudaMalloc(&pdata, size);
+		cuda_error_check;
 	}
 	else {
-		return sum;
+		cudaMallocManaged(&pdata, size);
+		cuda_error_check;
 	}
+}
+
+TempBufferPlace::TempBufferPlace(TempBufferPool& pool, int bufid, std::unique_ptr<TempBuffer> tmp)
+	: pool_(pool), bufferid(bufid), buffer(std::move(tmp)) { }
+TempBufferPlace::TempBufferPlace(TempBufferPlace&& place)
+	: pool_(place.pool_), bufferid(place.bufferid), buffer(std::move(place.buffer)) { }
+
+TempBufferPlace::~TempBufferPlace(void) {
+	if (buffer) pool_[bufferid] = std::move(buffer);
+}
+
+ManagedTempBlock::ManagedTempBlock(ManagedTempBlock&& other)
+	: pool(other.pool), startBlock(other.startBlock), endBlock(other.endBlock) {
+	endBlock = -1;
+}
+
+ManagedTempBlock::ManagedTempBlock(TempBufferPool& pool_, int startBlock_, int endBlock_)
+	: pool(pool_), startBlock(startBlock_), endBlock(endBlock_)
+{
+	if (endBlock > pool.blockPlace32.size()) {
+		printf("\033[31Preallocated unified buffer is not enough\033[0m\n");
+		throw std::runtime_error("not enough unified memory");
+	}
+	for (int i = startBlock; i < endBlock; i++) {
+		pool.blockPlace32[i] = true;
+	}
+}
+
+ManagedTempBlock::~ManagedTempBlock(void) {
+	for (int i = startBlock; i < endBlock; i++) {
+		pool.blockPlace32[i] = false;
+	}
+}
+
+TempBufferPool::TempBufferPool(void) {
+	// preallocate enough temporary managed buffer, 
+	int n32 = 1e4;
+	unifiedBuffer.reset(new TempBuffer(32 * n32, true));
+	blockPlace32.resize(n32, false);
+}
+
+TempBufferPlace TempBufferPool::getBuffer(size_t requireSize) {
+	int matchid = -1;
+	// find most matched buffer
+	for (int i = 0; i < buffers.size(); i++) {
+		if (buffers[i]) {
+			if (buffers[i]->siz >= requireSize) {
+				if (matchid<0 || buffers[matchid]->siz > buffers[i]->siz) {
+					matchid = i;
+				}
+			}
+		}
+	}
+	// if no match, allocate new
+	if (matchid < 0) {
+		buffers.emplace_back(std::make_unique<TempBuffer>(round(requireSize, 512)));
+		matchid = buffers.size() - 1;
+	}
+	TempBufferPlace buf(*this, matchid, std::move(buffers[matchid]));
+	return std::move(buf);
+}
+
+TempBufferPlace getTempBuffer(size_t siz) {
+	return getTempPool().getBuffer(siz);
+}
+
+std::unique_ptr<TempBuffer>& TempBufferPool::operator[](size_t id) {
+	if (id > buffers.size()) {
+		printf("\033[31mBuffer id out of range\033[0m\n");
+	}
+	return buffers[id];
+}
+
+//TempBufferPool tempPool;
+
+TempBufferPool& getTempPool(void) {
+	static std::unique_ptr<TempBufferPool> Pool;
+	if (!Pool) {
+		Pool = std::make_unique<TempBufferPool>();
+	}
+	return *Pool; 
 }
 
 void show_cuSolver_version(void) {
+#if 0
 	int major = -1, minor = -1, patch = -1;
 	cusolverGetProperty(MAJOR_VERSION, &major);
 	cusolverGetProperty(MINOR_VERSION, &minor);
 	cusolverGetProperty(PATCH_LEVEL, &patch);
 	printf("[cuda version] : %d.%d.%d\n", major, minor, patch);
+#else
+#endif
 }
 
 
 void init_cuda(void) {
 	get_device_info();
-	show_cuSolver_version();
-	if (std::is_same<Scaler, double>::value) {
-		cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-		printf("[bank width] : set 8 bytes \n");
-	}
-	else if(std::is_same<Scaler, float>::value){
-		cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
-		printf("[bank width] : set 4 bytes \n");
-	}
+	//show_cuSolver_version();
+	//if (std::is_same<Scaler, double>::value) {
+	//	cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+	//	printf("[bank width] : set 8 bytes \n");
+	//}
+	//else if(std::is_same<Scaler, float>::value){
+	//	cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
+	//	printf("[bank width] : set 4 bytes \n");
+	//}
 
-	printf("\n");
+	//printf("\n");
 
 	//
-	printf("-- test library...\n");
+	//printf("-- test library...\n");
 	lib_test();
 }
 
+static int bankWidth = 0;
+
 void use4Bytesbank(void) {
-	cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
-	printf("\033[32mCUDA> Using 4 byte bank width\n\033[0m");
+	if (bankWidth != 4) {
+		bankWidth = 4;
+		cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
+		printf("\033[32m[CUDA] bank Width = 4\n\033[0m");
+	}
 }
 void use8Bytesbank(void){
-	cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-	printf("\033[32mCUDA> Using 8 byte bank width\n\033[0m");
-}
-
-__global__ void remap(int n, Scaler* p, Scaler l_, Scaler h_, Scaler L_, Scaler H_) {
-	int tid = threadIdx.x + blockIdx.x*blockDim.x;
-	Scaler sca = (H_ - L_) / (h_ - l_);
-	if (tid < n) {
-		p[tid] = (p[tid] - l_)*sca + L_;
+	if (bankWidth != 8) {
+		bankWidth = 8;
+		cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+		printf("\033[32m[CUDA] bank Width = 8\n\033[0m");
 	}
 }
 
 
 void lib_test(void) {
-#if 0
-	// test sum kernel
-	Scaler* tmp, *tmp1;
-	Scaler* v[3], *u[3];
-	int large_size = 1e6;
-	cudaMalloc(&tmp, sizeof(Scaler)*large_size);
-	cudaMalloc(&tmp1, sizeof(Scaler)*large_size);
-	for (int i = 0; i < 3; i++) {
-		cudaMalloc(&v[i], sizeof(Scaler)*large_size);
-		cudaMalloc(&u[i], sizeof(Scaler)*large_size);
-	}
-	init_array(tmp, Scaler(1.5), large_size);
-	std::cout << "dump array sum " << dump_array_sum(tmp, large_size) << std::endl;
-	init_array(tmp, Scaler(1.5), large_size);
-	std::cout << "dump array sum v0 " << dump_array_sum_v0(tmp, large_size) << std::endl;
-	init_array(tmp, Scaler(1.5), large_size);
-	std::cout << "array_sum_gpu " << array_sum_gpu(tmp, large_size, tmp1) << std::endl;
-	init_array(tmp, Scaler(1.5), large_size);
-	std::cout << "parallel_sum " << parallel_sum(tmp, tmp1, large_size) << std::endl;
-	init_array(tmp, Scaler(1.5), large_size);
-	std::cout << "array_norm2  " << array_norm2(tmp, large_size) << std::endl;;
-	init_array(tmp, Scaler(1.5), large_size);
-	init_array(tmp + large_size - 1, Scaler(1.51), 1);
-	std::cout << "parallel max " << parallel_max(tmp, tmp1, large_size) << std::endl;
-	//std::cout << "parallel min " << parallel_min(tmp, tmp1, large_size) << std::endl;
 
-	for (int i = 0; i < 3; i++) { init_array(v[i], Scaler(1.5), large_size); init_array(u[i], Scaler(1.5), large_size); }
-	std::cout << "u * v = " << dot(u[0], u[1], u[2], v[0], v[1], v[2], tmp, large_size) << std::endl;
-
-	
-	for (int i = 0; i < 3; i++) { init_array(v[i], Scaler(1.5), large_size); init_array(u[i], Scaler(2), large_size); }
-	std::cout << "norm of u " << norm(u[0], u[1], u[2], tmp1, large_size) << std::endl;
-	std::cout << "norm of v " << norm(v[0], v[1], v[2], tmp1, large_size) << std::endl;
-
-
-	cuda_error_check;
-
-	cudaFree(tmp);
-	cudaFree(tmp1);
-	for (int i = 0; i < 3; i++) {
-		cudaFree(u[i]);
-		cudaFree(v[i]);
-	}
-#else
-
-#endif
-	printf("-- Passed\n");
 }
 
 int get_device_info()
@@ -213,17 +207,5 @@ int get_device_info()
 	return 0;
 }
 
-
-void* reserve_buf(size_t require) {
-	if (require < _libbufSize) {
-		return _libbuf;
-	} else {
-		cudaMalloc(&_libbuf, require);
-		_libbufSize = require;
-		return _libbuf;
-	}
 }
 
-void* get_libbuf(void) { return _libbuf; }
-
-size_t get_libbuf_size(void) { return _libbufSize; }

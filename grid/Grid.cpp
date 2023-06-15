@@ -1581,12 +1581,24 @@ size_t grid::Grid::build(
 		//}
 	}
 
+	// for heat conduction
+	if (enableHeatGrid) {
+		_gbuf.uT = (ScalarT*)gm.add_buf(_name + " uT " , sizeof(ScalarT)* nv_gs);
+		_gbuf.rT = (ScalarT*)gm.add_buf(_name + " uT " , sizeof(ScalarT)* nv_gs);
+		_gbuf.fT = (ScalarT*)gm.add_buf(_name + " uT " , sizeof(ScalarT)* nv_gs);
+	}
+
 	// finest layer
 	if (layer == 0) {
 		_gbuf.rho_e = (float*)gm.add_buf(_name + "rho_e ", sizeof(float) * ne_gs); gbuf_size += sizeof(float) * ne_gs;
 		_gbuf.eActiveBits = (unsigned int*)gm.add_buf(_name + "eActiveBits", sizeof(unsigned int)*ebit._bitArray.size(), ebit._bitArray.data()); gbuf_size += sizeof(unsigned int) * ebit._bitArray.size();
 		_gbuf.eActiveChunkSum = (int*)gm.add_buf(_name + "eActiveChunkSum", sizeof(int)*ebit._chunkSat.size(), ebit._chunkSat.data()); gbuf_size += sizeof(int) * ebit._chunkSat.size();
 		_gbuf.nword_ebits = ebit._bitArray.size();
+
+		// for heat
+		if(enableHeatGrid) {
+			_gbuf.rhoHeat = (float *)gm.add_buf(_name + "heat rho_e ", sizeof(float) * ne_gs);
+		}
 	}
 
 	// allocate v2e topology buffer 
@@ -1669,6 +1681,14 @@ size_t grid::Grid::build(
 	if (_layer != 0) {
 		_gbuf.rxStencil = (double*)gm.add_buf(_name + " rxStencil ", sizeof(double) * nv_gs * 27 * 9); gbuf_size += sizeof(double) * nv_gs * 27 * 9;
 		gpu_manager_t::initMem(_gbuf.rxStencil, sizeof(double) * nv_gs * 27 * 9);
+
+		// for heat stencil
+		if(enableHeatGrid) {
+			for (int i = 0; i < 27; i++) {
+				_gbuf.tStencil[i] = (ScalarT *)gm.add_buf(_name + " T rxStencil " + std::to_string(i), sizeof(ScalarT) * nv_gs);
+				gpu_manager_t::initMem(_gbuf.tStencil[i], sizeof(ScalarT) * nv_gs);
+			}
+		}
 	}
 
 	printf("-- Allocate %d MB buffer\n", gbuf_size / 1024 / 1024);

@@ -15,6 +15,7 @@
 //#define DIRICHLET_DIAGONAL_WEIGHT 1
 
 using namespace grid;
+using namespace culib;
 
 __constant__ double gTemplateMatrix[24][24];
 __constant__ int* gV2E[8];
@@ -39,6 +40,10 @@ __constant__ int* gVflag[1];
 __constant__ int* gEflag[1];
 __constant__ int gLayerid[1];
 __constant__ int gDEBUG[1];
+
+__constant__ ScalarT* gT;
+__constant__ ScalarT* gFT;
+__constant__ ScalarT* gRT;
 
 extern __constant__ double* gLoadtangent[2][3];
 extern __constant__ double* gLoadnormal[3];
@@ -1938,8 +1943,7 @@ void Grid::reset_residual(void)
 
 double Grid::v3norm(double* v[3])
 {
-	double* tmp = (double*)getTempBuf(n_nodes() * sizeof(double) / 100);
-	double s = norm(v[0], v[1], v[2], tmp, n_nodes());
+	double s = norm(v[0], v[1], v[2], n_nodes());
 	return s;
 }
 
@@ -2207,15 +2211,14 @@ double Grid::v3_dot(double* v[3], double* u[3])
 
 double Grid::v3_diffdot(double* v1[3], double* v2[3], double* v3[3], double* v4[3])
 {
-	double sum = parallel_diffdot(n_nodes(), v1, v2, v3, v4, (double*)getTempBuf(n_gsvertices / 100 * sizeof(double)));
+	double sum = parallel_diffdot(n_nodes(), v1, v2, v3, v4);
 	cuda_error_check;
 	return sum;
 }
 
 double Grid::v3_norm(double* v[3])
 {
-	double* tmp = (double*)getTempBuf(n_gsvertices / 100 * sizeof(double));
-	double s = norm(v[0], v[1], v[2], tmp, n_nodes());
+	double s = norm(v[0], v[1], v[2], n_nodes());
 	return s;
 }
 
@@ -2259,7 +2262,7 @@ double Grid::supportForceCh(void)
 
 	getForceSupport(_gbuf.F, fs);
 
-	double sum = parallel_diffdot(n_loadnodes(), _gbuf.Fsupport, fs, _gbuf.Fsupport, fs, fs[3]);
+	double sum = parallel_diffdot(n_loadnodes(), _gbuf.Fsupport, fs, _gbuf.Fsupport, fs);
 	cuda_error_check;
 
 	return sqrt(sum);
@@ -2272,7 +2275,7 @@ double grid::Grid::supportForceCh(double* newf[3])
 
 	getForceSupport(newf, newfs);
 
-	double sum = parallel_diffdot(n_loadnodes(), _gbuf.Fsupport, newfs, _gbuf.Fsupport, newfs, newfs[3]);
+	double sum = parallel_diffdot(n_loadnodes(), _gbuf.Fsupport, newfs, _gbuf.Fsupport, newfs);
 	cuda_error_check;
 
 	return sqrt(sum);
@@ -2280,7 +2283,7 @@ double grid::Grid::supportForceCh(double* newf[3])
 
 double Grid::supportForceNorm(void)
 {
-	double sum = norm(_gbuf.Fsupport[0], _gbuf.Fsupport[1], _gbuf.Fsupport[2], (double*)getTempBuf(sizeof(double) * n_loadnodes() / 100), n_loadnodes());
+	double sum = norm(_gbuf.Fsupport[0], _gbuf.Fsupport[1], _gbuf.Fsupport[2], n_loadnodes());
 	cuda_error_check;
 	return sum;
 }
@@ -3400,7 +3403,7 @@ void grid::Grid::pertubForce(double ratio)
 	getForceSupport(_gbuf.F, getSupportForce());
 	double** fsptr = getSupportForce();
 	devArray_t<double*, 3> fs{ fsptr[0],fsptr[1],fsptr[2] };
-	double oldnorm = norm(fs[0], fs[1], fs[2], (double*)getTempBuf(n_loadnodes() / 100 * sizeof(double)), n_loadnodes());
+	double oldnorm = norm(fs[0], fs[1], fs[2], n_loadnodes());
 
 	// compute required noise norm
 	double noisyNormRequare = oldnorm * ratio;
@@ -3411,7 +3414,7 @@ void grid::Grid::pertubForce(double ratio)
 	for (int i = 0; i < 3; i++) {
 		randArray<double>(fsNoise._data, 3, n_loadnodes(), -1, 1);
 	}
-	double noiseNorm = norm(fsNoise[0], fsNoise[1], fsNoise[2], (double*)getTempBuf(n_loadnodes() / 100 * sizeof(double)), n_loadnodes());
+	double noiseNorm = norm(fsNoise[0], fsNoise[1], fsNoise[2], n_loadnodes());
 
 	// add scaled noise
 	double scaleRatio = noisyNormRequare / noiseNorm;
@@ -3508,7 +3511,7 @@ float grid::Grid::volumeRatio(void)
 {
 	cuda_error_check;
 	float* tmp = (float*)getTempBuf(sizeof(float)* n_gselements / 100);
-	float v = parallel_sum(_gbuf.rho_e, tmp, n_gselements);
+	float v = parallel_sum(_gbuf.rho_e, n_gselements);
 	cudaDeviceSynchronize();
 	cuda_error_check;
 	return v / n_gselements;
@@ -3565,7 +3568,6 @@ double grid::Grid::densityDiscretiness(void)
 	cudaDeviceSynchronize();
 	cuda_error_check;
 
-	double* sum = (double*)grid::Grid::getTempBuf(sizeof(double) * n_gselements / 100);
-	double Md = parallel_sum_d(pout, sum, n_gselements) / n_gselements;
+	double Md = parallel_sum_d(pout, n_gselements) / n_gselements;
 	return Md;
 }
