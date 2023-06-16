@@ -30,11 +30,15 @@ CGMesh cmesh;
 extern HierarchyGrid grids;
 
 static Eigen::SparseMatrix<double> Klast;
+static Eigen::SparseMatrix<double> Ktlast;
 static Eigen::Matrix<double, -1, -1> fullK;
+static Eigen::Matrix<double, -1, -1> fullKt;
 static Eigen::Matrix<double, -1, -1> Klastkernel;
+static Eigen::Matrix<double, -1, -1> Ktlastkernel;
 static std::vector<int> vlastrowid;
 static int nvlastrows;
 static Eigen::BDCSVD<Eigen::MatrixXd> svd;
+static Eigen::BDCSVD<Eigen::MatrixXd> svdT;
 
 void HierarchyGrid::buildAABBTree(const std::vector<float>& pcoords, const std::vector<int>& trifaces)
 {
@@ -1958,6 +1962,65 @@ void Grid::buildCoarsestSystem(void)
 	eigen2ConnectedMatlab("Klastker", Klastkernel);
 }
 
+void Grid::buildHeatCoarsestSystem(void) {
+	std::vector<ScalarT> rxdata[27];
+	for (int i = 0; i < 27; i++) {
+		rxdata[i].resize(n_gsvertices);
+		gpu_manager_t::download_buf(rxdata[i].data(), _gbuf.tStencil[i], sizeof(ScalarT) * n_gsvertices);
+	}
+
+	std::vector<Eigen::Triplet<double>> triplist;
+
+	vlastrowid.resize(n_gsvertices);
+	int rowid = 0;
+	for (int i = 0; i < n_gsvertices; i++) {
+		if (_v2v[13][i] != -1) {
+			vlastrowid[i] = rowid;
+			rowid++;
+		}
+		else {
+			vlastrowid[i] = -1;
+		}
+	}
+
+	nvlastrows = rowid;
+
+	Ktlast.resize(rowid, rowid);
+	fullKt.resize(rowid, rowid);
+	fullKt.fill(0);
+
+	for (int i = 0; i < rxdata->size(); i++) {
+		for (int j = 0; j < 27; j++) {
+			double rxvalue = rxdata[i][j];
+			int vid = i;
+			// stencil is stored in row major order
+			int nei = j;
+			int nid = _v2v[nei][vid];
+			if (nid == -1)
+				continue;
+			triplist.emplace_back(vlastrowid[vid], vlastrowid[nid], rxvalue);
+			fullKt(vlastrowid[vid], vlastrowid[nid]) = rxvalue;
+		}
+	}
+
+	Ktlast.setFromTriplets(triplist.begin(), triplist.end());
+
+	//fullK = Klast;
+	//svd.setThreshold(1e-11);
+	svdT.compute(fullKt, Eigen::ComputeFullU | Eigen::ComputeFullV);
+	int lossrank = fullKt.rows() - svdT.rank();
+	printf("-- degenerate rank = %d\n", lossrank);
+	if (lossrank > 0) {
+		Ktlastkernel = svdT.matrixV().block(0, fullKt.cols() - lossrank, fullKt.rows(), lossrank);
+	}
+	else {
+		Ktlastkernel = Eigen::VectorXd::Zero(fullKt.rows(), 1);
+	}
+
+	eigen2ConnectedMatlab("KTlast", fullKt);
+	eigen2ConnectedMatlab("KTlastker", Ktlastkernel);
+}
+
 void Grid::stencil2matlab(const std::string& nam)
 {
 	Eigen::Matrix<double, -1, -1> stencilarray;
@@ -2138,4 +2201,14 @@ void HierarchyGrid::update_stencil(void)
 	}
 }
 
-
+void HierarchyGrid::update_heat_stencil(void) {
+	for (int i = 0; i < _gridlayer.size(); i++) {
+		if (_gridlayer[i]->is_dummy()) continue;
+		if (i == 0) continue;
+		restrict_heat_stencil(*_gridlayer[i], *_gridlayer[i]->fineGrid);
+		// last layer build host system
+		if (i == _gridlayer.size() - 1) {
+			_gridlayer[i]->buildHeatCoarsestSystem();
+		}
+	}
+}

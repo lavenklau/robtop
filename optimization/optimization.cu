@@ -34,6 +34,7 @@ extern  __constant__ int* gEflag[1];
 extern  __constant__ int gLayerid[1];
 extern  __constant__ int gDEBUG[1];
 
+extern __constant__ double gHeatMatrix[8][8];
 
 extern __device__ void loadTemplateMatrix(volatile double KE[24][24]);
 
@@ -342,6 +343,10 @@ void uploadTemplateMatrix(void)
 	float power = params.power_penalty;
 	cudaMemcpyToSymbol(power_penalty, &power, sizeof(power_penalty));
 	cuda_error_check;
+
+	// upload heat matrix
+	const double* pKT = getHeatTemplateMatrixElements();
+	cudaMemcpyToSymbol(gHeatMatrix, pKT, sizeof(gHeatMatrix));
 }
 
 void setDEBUG(bool debug)

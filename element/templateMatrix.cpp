@@ -9,6 +9,7 @@ Scalar mu = default_poisson_ratio;
 Scalar E = default_youngs_modulus;
 Eigen::Matrix<Scalar, 6, 6> elastic_matrix;
 Eigen::Matrix<Scalar, 24, 24> Ke;
+Eigen::Matrix<Scalar, 8, 8> KT;
 
 Scalar* g_Ke;
 
@@ -28,10 +29,33 @@ Eigen::Matrix<Scalar, 3, 1> dN(int i, Scalar elen, Eigen::Matrix<Scalar, 3, 1>& 
 	return dn;
 }
 
-void initTemplateMatrix(
-	Scalar element_len, gpu_manager_t& gm,
-	Scalar ymodu /*= default_younds_modulu*/, Scalar ps_ratio /*= default_poisson_ratio*/)
-{
+void initHeatTemplateMatrix(Scalar element_len, gpu_manager_t &gm) {
+	Eigen::Matrix<Scalar, 3, 1> gs_points[8];
+	double p = sqrt(3) / 3;
+	for (int i = 0; i < 8; i++) {
+		int x = 2 * (i % 2) - 1;
+		int y = 2 * (i / 2 % 2) - 1;
+		int z = 2 * (i / 4) - 1;
+		gs_points[i][0] = (x * p + 1) / 2;
+		gs_points[i][1] = (y * p + 1) / 2;
+		gs_points[i][2] = (z * p + 1) / 2;
+	}
+	// Gauss Quadrature Point
+	for (int i = 0; i < 8; i++) {
+		Eigen::Matrix<Scalar, 3, 1> grad_N[8];
+		// Element Vertex Point
+		for (int k = 0; k < 8; k++) {
+			grad_N[k] = dN(k, element_len, gs_points[i]);
+		}
+		for (int row = 0; row < 8; row++) {
+			for (int col = 0; col < 8; col++) {
+				KT(row, col) += grad_N[row].dot(grad_N[col]);
+			}
+		}
+	}
+}
+
+void initElasticTemplateMatrix(Scalar element_len, gpu_manager_t &gm, Scalar ymodu, Scalar ps_ratio) {
 	mu = ps_ratio;
 	E = ymodu;
 	elastic_matrix << 1 - mu, mu, mu, 0, 0, 0,
@@ -121,6 +145,15 @@ void initTemplateMatrix(
 	}
 
 	eigen2ConnectedMatlab("RE", RE);
+
+}
+
+void initTemplateMatrix(
+	Scalar element_len, gpu_manager_t &gm,
+	Scalar ymodu /*= default_younds_modulu*/, Scalar ps_ratio /*= default_poisson_ratio*/)
+{
+	initElasticTemplateMatrix(element_len, gm, ymodu, ps_ratio);
+	initHeatTemplateMatrix(element_len, gm);
 }
 
 const Eigen::Matrix<Scalar, 24, 24>& getTemplateMatrix(void)
@@ -128,9 +161,16 @@ const Eigen::Matrix<Scalar, 24, 24>& getTemplateMatrix(void)
 	return Ke;
 }
 
-const Scalar* getTemplateMatrixElements(void)
-{
+const Eigen::Matrix<Scalar, 8, 8>& getHeatTemplateMatrix(void) {
+	return KT;
+}
+
+const Scalar* getTemplateMatrixElements(void) {
 	return Ke.data();
+}
+
+const Scalar* getHeatTemplateMatrixElements(void) {
+	return KT.data();
 }
 
 Scalar* getDeviceTemplateMatrix(void) {

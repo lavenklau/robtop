@@ -16,7 +16,11 @@ void initTemplateMatrix(Scalar element_len, gpu_manager_t& gm, Scalar ymodu = de
 
 const Eigen::Matrix<Scalar, 24, 24>& getTemplateMatrix(void);
 
+const Eigen::Matrix<Scalar, 8, 8>& getHeatTemplateMatrix(void);
+
 const Scalar* getTemplateMatrixElements(void);
+
+const Scalar* getHeatTemplateMatrixElements(void);
 
 Scalar* getDeviceTemplateMatrix(void);
 

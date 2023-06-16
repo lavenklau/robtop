@@ -480,6 +480,8 @@ namespace grid {
 
 		void buildCoarsestSystem(void);
 
+		void buildHeatCoarsestSystem(void);
+
 		void compute_gscolor(gpu_manager_t& gm, BitSAT<unsigned int>& vbitsat, BitSAT<unsigned int>& ebitsat, int vreso, int* vbitflaghost, int* ebitflaghost);
 
 		void enumerate_gs_subset(int nv, int ne, int* vflags, int* eflags, int& nv_gs, int& ne_gs, std::vector<int>& vlexi2gs, std::vector<int>& elexi2gs);
@@ -696,6 +698,8 @@ namespace grid {
 		void getNodePos(Grid& g, std::vector<double>& p3host);
 
 		void update_stencil(void);
+
+		void update_heat_stencil(void);
 
 		//void update_adjoint_stencil(void);
 

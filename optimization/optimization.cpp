@@ -694,6 +694,11 @@ void update_stencil(void)
 	grids.update_stencil();
 }
 
+
+void update_heat_stencil(void){
+	grids.update_heat_stencil();
+}
+
 void test_rigid_displacement(void) {
 	grids[0]->reset_residual();
 	for (int n = 0; n < 3; n++) {

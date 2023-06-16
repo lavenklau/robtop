@@ -253,7 +253,7 @@ void Grid::gs_relax_heat(int n_times)
 				constexpr int BlockSize = 32 * 8;
 				size_t grid_size, block_size;
 				make_kernel_param(&grid_size, &block_size, gs_num[i] * 8, BlockSize);
-                gs_relax_Heat_OTFA_kernel<<<grid_size, block_size>>>(gs_num[i], gs_offset, _gbuf.rho_e);
+                gs_relax_Heat_OTFA_kernel<<<grid_size, block_size>>>(gs_num[i], gs_offset, _gbuf.rhoHeat);
                 cudaDeviceSynchronize();
                 cuda_error_check;
 				gs_offset += gs_num[i];
@@ -372,7 +372,7 @@ void grid::Grid::update_heat_residual(void) {
 	if (_layer == 0)
 	{
 		make_kernel_param(&grid_size, &block_size, n_gsvertices, 256);
-		update_heat_residual_OTFA_kernel<<<grid_size, block_size>>>(n_gsvertices, _gbuf.rho_e);
+		update_heat_residual_OTFA_kernel<<<grid_size, block_size>>>(n_gsvertices, _gbuf.rhoHeat);
 		cudaDeviceSynchronize();
 		cuda_error_check;
 	}
@@ -835,7 +835,7 @@ void grid::HierarchyGrid::restrict_heat_stencil(grid::Grid &dstcoarse, grid::Gri
 		size_t grid_size, block_size;
 		make_kernel_param(&grid_size, &block_size, dstcoarse.n_gsvertices, 256);
 		restrict_heat_stencil_nondyadic_OTFA_kernel<<<grid_size, block_size>>>(
-			dstcoarse.n_gsvertices, coarseStencil, srcfine.n_gsvertices, srcfine._gbuf.rho_e, srcfine._gbuf.vBitflag, ScalarT(1.));
+			dstcoarse.n_gsvertices, coarseStencil, srcfine.n_gsvertices, srcfine._gbuf.rhoHeat, srcfine._gbuf.vBitflag, ScalarT(1.));
 		cudaDeviceSynchronize();
 		cuda_error_check;
 	}

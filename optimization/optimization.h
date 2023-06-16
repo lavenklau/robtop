@@ -81,6 +81,8 @@ void initDensities(double rho);
 
 void update_stencil(void);
 
+void update_heat_stencil(void);
+
 void test_rigid_displacement(void);
 
 #endif
