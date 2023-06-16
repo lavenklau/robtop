@@ -234,8 +234,12 @@ _blocksum:
 
         ScalarT newT /*= {gUT[vid]}*/;
 		newT = (gFT[vid] - KT) / S;
-		if (flag & Grid::mask_sink_nodes) newT = 0;
-		gT[vid] = newT; 
+		if (flag & Grid::mask_sink_nodes) {
+			gFT[vid] = 0;
+			gT[vid] = 0;
+		} else {
+			gT[vid] = newT;
+		}
 	}
 }
 
@@ -261,7 +265,6 @@ void Grid::gs_relax_heat(int n_times)
 		}
 	}
 	else {
-		check_array_len(_gbuf.rxStencil, 27 * 9 * n_gsvertices);
         devArray_t<ScalarT *, 27> st;
         for (int i = 0; i < 27; i++) { st[i] = _gbuf.tStencil[i]; }
 
@@ -296,14 +299,13 @@ __global__ void update_heat_residual_OTFA_kernel(int nv, float* rholist) {
 	int vid = tid;
 
 	// add fixed flag check
-	bool vsink[27], vload[27];
+	bool vsink[27];
 	int v2v[27];
 	for (int i = 0; i < 27; i++) {
 		v2v[i] = gV2V[i][vid];
 		if (v2v[i] != -1) {
 			int flag = gVflag[0][v2v[i]];
 			vsink[i] = flag & grid::Grid::mask_sink_nodes;
-			vload[i] = flag & grid::Grid::Bitmask::mask_loadnodes;
 		}
 	}
 
@@ -604,24 +606,29 @@ void grid::Grid::prolongate_heat_correction(void)
 double HierarchyGrid::v_cycle_heat(int pre_relax, int post_relax)
 {
 	int depth = n_grid() - 1;
+	printf(" |f0| = %e\n", _gridlayer[0]->tF_norm());
 	// downside
 	for (int i = 0; i < depth + 1; i++) {
 		if (_gridlayer[i]->is_dummy()) { continue; }
 		if (i > 0) {
 			//_gridlayer[i]->stencil2matlab("rxcoarse");
 			_gridlayer[i]->fineGrid->update_heat_residual();
+			printf("[%d] r_fine = %e\n", i, _gridlayer[i]->fineGrid->tR_norm());
 			//_gridlayer[i]->fineGrid->residual2matlab("rfine");
-			_gridlayer[i]->restrict_heat_residual(); 
+			_gridlayer[i]->restrict_heat_residual();
+			printf("[%d] f_coarse = %e\n", i, _gridlayer[i]->tF_norm());
 			//_gridlayer[i]->force2matlab("fcoarse");
 			_gridlayer[i]->reset_heat_displacement();
 		}
 		if (i < n_grid() - 1) {
 			_gridlayer[i]->gs_relax_heat(pre_relax);
 			//_gridlayer[i]->displacement2matlab("u");
+			printf("[%d] u_rx = %e\n", i, _gridlayer[i]->tT_norm());
 		}
 		else {
 			//_gridlayer[i]->force2matlab("f");
 			_gridlayer[i]->solve_heat_fem_host();
+			printf("[%d] u_direct = %e\n", i, _gridlayer[i]->tT_norm());
 			//_gridlayer[i]->displacement2matlab("u");
 		}
 	}
@@ -634,11 +641,13 @@ double HierarchyGrid::v_cycle_heat(int pre_relax, int post_relax)
 		//_gridlayer[i]->update_residual();
 		//printf("-- [%d] r = %lf%%\n", i, _gridlayer[i]->relative_residual() * 100);
 		_gridlayer[i]->prolongate_heat_correction();
+		printf("[%d] u_pro = %e\n", i, _gridlayer[i]->tT_norm());
 		//_gridlayer[i]->update_residual();
 		//printf("-- [%d] rc=  %lf%%\n", i, _gridlayer[i]->relative_residual() * 100);
 		//_gridlayer[i]->displacement2matlab("uc");
 		//_gridlayer[i]->force2matlab("fc");
 		_gridlayer[i]->gs_relax_heat(post_relax);
+		printf("[%d] u_prorelx = %e\n", i, _gridlayer[i]->tT_norm());
 		//_gridlayer[i]->update_residual();
 		//printf("-- [%d] rr=  %lf%%\n", i, _gridlayer[i]->relative_residual() * 100);
 		//_gridlayer[i]->displacement2matlab("ur");
@@ -851,4 +860,21 @@ void grid::HierarchyGrid::restrict_heat_stencil(grid::Grid &dstcoarse, grid::Gri
 		cudaDeviceSynchronize();
 		cuda_error_check;
 	}
+}
+
+double grid::Grid::v1norm(double *v) {
+	return culib::norm(v, n_gsvertices);
+}
+double grid::Grid::v1norm(float *v) {
+	return culib::norm(v, n_gsvertices);
+}
+
+double grid::Grid::tT_norm(void) {
+	return v1norm(_gbuf.uT);
+}
+double grid::Grid::tR_norm(void) {
+	return v1norm(_gbuf.rT);
+}
+double grid::Grid::tF_norm(void) {
+	return v1norm(_gbuf.fT);
 }

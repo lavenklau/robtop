@@ -468,6 +468,15 @@ void averageNodeT(grid::Grid &grid)
 	cuda_error_check;
 }
 
+void testGsRelax(Grid& grid) {
+	for (int iter = 0; iter < 50; iter++) {
+		grid.gs_relax_heat();
+		grid.update_heat_residual();
+		double rel = grid.relative_heat_residual();
+		printf("It. %d   rel = %le\n", iter, rel);
+	}
+}
+
 void testHeatFEM(void) {
 	auto& grid = *grids[0];
 	grid.use_grid();
@@ -477,11 +486,14 @@ void testHeatFEM(void) {
 	// init Conductivity
 	init_array(grid._gbuf.ce, 0.5f, grid.n_gselements);
 	// init source
-	init_array(grid._gbuf.fT, 1.f, grid.n_gsvertices);
+	//init_array(grid._gbuf.fT, 1.f, grid.n_gsvertices);
+	randArray(&grid._gbuf.fT, 1, grid.n_gsvertices, 0.f, 1.f);
 	// choose sink nodes
 	setSinkNodes(grid);
 	update_heat_stencil();
 	solveHeatFEM();
+	// testGsRelax(grid);
 	averageNodeT(grid);
 	grids.writeHeat(grids.getPath("te.vdb"));
+	grids.get_gmem().clear();
 }

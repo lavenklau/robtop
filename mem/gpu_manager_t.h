@@ -77,6 +77,8 @@ public:
 
 	static void pass_buf_to_matlab(const char* name, int* host_ptr, size_t n);
 
+	void clear(void);
+
 	class symbol_uploader_t {
 	public:
 		//void upload_template_stiffness_matrix(Scaler* src);

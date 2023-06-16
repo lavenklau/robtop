@@ -17,7 +17,9 @@ void* gpu_manager_t::add_buf(size_t size, const void* src /*= nullptr*/)
 	return add_buf(name_, size, src);
 }
 
-
+void gpu_manager_t::clear(void) {
+	gpu_buf.clear();
+}
 
 size_t gpu_manager_t::size(void)
 {

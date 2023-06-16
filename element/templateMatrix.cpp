@@ -54,6 +54,10 @@ void initHeatTemplateMatrix(Scalar element_len, gpu_manager_t &gm) {
 			}
 		}
 	}
+
+	KT *= 1000 * pow(element_len / 2, 3);
+
+	std::cout << "KT = \n" << KT << std::endl;
 }
 
 void initElasticTemplateMatrix(Scalar element_len, gpu_manager_t &gm, Scalar ymodu, Scalar ps_ratio) {

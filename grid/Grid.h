@@ -546,6 +546,11 @@ namespace grid {
 		int n_nodes(void) { return n_gsvertices; }
 		int n_valid_elements(void) { return n_elements; }
 		int n_rho(void) { return n_gselements; }
+		double v1norm(double* v);
+		double v1norm(float* v);
+		double tT_norm(void);
+		double tR_norm(void);
+		double tF_norm(void);
 		double v3norm(double* v[3]);
 
 		void v3_create(double* dstv[3]);

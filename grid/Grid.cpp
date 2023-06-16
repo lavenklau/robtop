@@ -2021,6 +2021,7 @@ void Grid::buildHeatCoarsestSystem(void) {
 	svdT.compute(fullKt, Eigen::ComputeFullU | Eigen::ComputeFullV);
 	int lossrank = fullKt.rows() - svdT.rank();
 	printf("-- degenerate rank = %d\n", lossrank);
+	std::cout << "|Kt| = " << fullKt.norm() << "|Kt-Kt'| = " << (fullKt - fullKt.transpose()).norm() << "\n";
 	if (lossrank > 0) {
 		Ktlastkernel = svdT.matrixV().block(0, fullKt.cols() - lossrank, fullKt.rows(), lossrank);
 	}
@@ -2142,7 +2143,7 @@ void Grid::solve_heat_fem_host(void)
 	//auto& solverhost = svd;
 	//static Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solverhost;
 	static Eigen::Matrix<double, -1, 1> fhost;
-	static std::vector<double> vhost;
+	static std::vector<ScalarT> vhost;
 	static Eigen::Matrix<double, -1, 1> uhost;
 
 	int nrow = nvlastrows;
@@ -2150,14 +2151,21 @@ void Grid::solve_heat_fem_host(void)
 	vhost.resize(n_gsvertices);
 	gpu_manager_t::download_buf(vhost.data(), _gbuf.fT, sizeof(ScalarT) * n_gsvertices);
 	fhost.resize(nrow, 1);
+	fhost.fill(0);
 	for (int i = 0; i < vhost.size(); i++) {
 		if (vlastrowid[i] == -1) continue;
 		fhost[vlastrowid[i]] = vhost[i];
 	}
 
+	double fhnorm = fhost.norm();
+	printf("|fh| = %le\n", fhnorm);
+
 	//// solve
 	//uhost = solverhost.solve(fhost);
 	uhost = svdT.solve(fhost);
+	double uhnorm = uhost.norm();
+	printf("|uh| = %le\n", uhnorm);
+
 	// DEBUG
 	eigen2ConnectedMatlab("uhost", uhost);
 	eigen2ConnectedMatlab("fhost", fhost);
@@ -2264,6 +2272,10 @@ void HierarchyGrid::update_heat_stencil(void) {
 		// last layer build host system
 		if (i == _gridlayer.size() - 1) {
 			_gridlayer[i]->buildHeatCoarsestSystem();
+		}
+		if (i > 0) {
+			_gridlayer[i]->reset_heat_force();
+			_gridlayer[i]->reset_heat_residual();
 		}
 	}
 }
