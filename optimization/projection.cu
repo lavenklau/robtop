@@ -16,6 +16,8 @@
 
 //#define check_cublas( sta ) if(sta!=CUBLAS_STATUS_SUCCESS) { printf("\033[31mcuBLAS error at line %d, file %s\n error name : %s\n\033[0m",__LINE__,__FILE__,cublasGetStatusName(sta));}
 
+using namespace culib;
+
 double* _Rdata[3];
 double* _Rudata[3];
 cublasHandle_t cublas_handle;

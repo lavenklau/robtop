@@ -99,7 +99,7 @@ __global__ void gs_relax_heat_kernel(int n_vgstotal, int nv_gsset, devArray_t<T,
 
 _blockSum:
 
-    sumAT[0][warpId][node_id_in_block] = AT[i];
+    sumAT[0][warpId][node_id_in_block] = AT;
 
     __syncthreads();
 

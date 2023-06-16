@@ -1,6 +1,8 @@
 #include "test_utils.h"
 #include "lib.cuh"
 
+using namespace culib;
+
 extern  __constant__  double gTemplateMatrix[24][24];
 extern  __constant__ int* gV2E[8];
 extern  __constant__ int* gV2Vfine[27];

@@ -8,6 +8,8 @@
 #include "templateMatrix.h"
 //#include "gpuVector.h"
 
+using namespace culib;
+
 extern  __constant__  double gTemplateMatrix[24][24];
 extern  __constant__ int* gV2E[8];
 extern  __constant__ int* gV2Vfine[27];
@@ -173,12 +175,12 @@ float updateDensities(float Vgoal) {
 	float g_thres_upp = 1;
 
 	// compute old volume ratio
-	double* sum = (double*)grid::Grid::getTempBuf(sizeof(double) * grids[0]->n_rho() / 100);
-	double Vold = parallel_sum_d(grids[0]->getRho(), sum, grids[0]->n_rho()) / grids[0]->n_rho();
+	// double* sum = (double*)grid::Grid::getTempBuf(sizeof(double) * grids[0]->n_rho() / 100);
+	double Vold = parallel_sum_d(grids[0]->getRho(), grids[0]->n_rho()) / grids[0]->n_rho();
 
 	// compute maximal sensitivity
-	float* maxdump = (float*)grid::Grid::getTempBuf(sizeof(float)* grids[0]->n_rho() / 100);
-	float g_max = parallel_maxabs(grids[0]->getSens(), maxdump, grids[0]->n_rho());
+	// float* maxdump = (float*)grid::Grid::getTempBuf(sizeof(float)* grids[0]->n_rho() / 100);
+	float g_max = parallel_maxabs(grids[0]->getSens(), grids[0]->n_rho());
 
 	g_thres_upp = g_max;
 

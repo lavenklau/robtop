@@ -6,6 +6,7 @@
 #include"gpuVector.cuh"
 
 //#define __DEBUG_GVECTOR
+using namespace culib;
 
 
 namespace gv {
@@ -422,7 +423,7 @@ namespace gv {
 	Scalar gVector::sum(void) const
 	{
 		//gVector tmp((size() + 511) / 512);
-		Scalar res = parallel_sum(data(), buf_vector.data(), size());
+		Scalar res = parallel_sum(data(), size());
 		return res;
 	}
 
@@ -716,13 +717,13 @@ namespace gv {
 	Scalar gVector::max(void) const
 	{
 		//gVector tmp((size() + 511) / 512);
-		return parallel_max(data(), buf_vector.data(), size());
+		return parallel_max(data(), size());
 	}
 
 	Scalar gVector::min(void) const
 	{
 		//gVector tmp((size() + 511) / 512);
-		return parallel_min(data(), buf_vector.data(), size());
+		return parallel_min(data(), size());
 	}
 
 	Scalar gv::gVector::min_positive(void) const
@@ -752,7 +753,7 @@ namespace gv {
 	Scalar gv::gVector::infnorm(void) const
 	{
 		//gv::gVector tmp((size() + 511) / 512);
-		return parallel_maxabs(_data, buf_vector.data(), size());
+		return parallel_maxabs(_data, size());
 	}
 
 	Scalar gVector::sqrnorm(void) const 

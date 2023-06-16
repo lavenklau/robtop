@@ -10,6 +10,8 @@
 #include"lib.cuh"
 #include"type_traits"
 
+using namespace culib;
+
 namespace gv {
 
 
@@ -299,7 +301,7 @@ struct exp_t
 		cudaDeviceSynchronize();
 		cuda_error_check;
 		n = (n + 511) / 512;
-		return dump_max(pbuf, n);
+		return parallel_max(pbuf, n);
 	}
 
 	Scalar min(void) {
@@ -314,7 +316,7 @@ struct exp_t
 		cudaDeviceSynchronize();
 		cuda_error_check;
 		n = (n + 511) / 512;
-		return dump_min(pbuf, n);
+		return parallel_min(pbuf, n);
 	}
 
 	Scalar norm(void) {

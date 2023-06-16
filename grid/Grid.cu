@@ -41,6 +41,10 @@ __constant__ int* gEflag[1];
 __constant__ int gLayerid[1];
 __constant__ int gDEBUG[1];
 
+__constant__ ScalarT* gRTfine;
+__constant__ ScalarT* gTcoarse;
+__constant__ double gHeatMatrix[8][8];
+
 __constant__ ScalarT* gT;
 __constant__ ScalarT* gFT;
 __constant__ ScalarT* gRT;
