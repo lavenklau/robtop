@@ -40,6 +40,7 @@ void initHeatTemplateMatrix(Scalar element_len, gpu_manager_t &gm) {
 		gs_points[i][1] = (y * p + 1) / 2;
 		gs_points[i][2] = (z * p + 1) / 2;
 	}
+	KT.fill(0);
 	// Gauss Quadrature Point
 	for (int i = 0; i < 8; i++) {
 		Eigen::Matrix<Scalar, 3, 1> grad_N[8];

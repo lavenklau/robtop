@@ -728,15 +728,13 @@ void HierarchyGrid::writeSupportForce(const std::string& filename)
 	bio::write_vectors<double, 3>(filename, hostfs);
 }
 
-void HierarchyGrid::writeDensity(const std::string& filename)
+void HierarchyGrid::writeElmentScalar(const std::string& filename, float* edata) 
 {
 	printf("-- writing vdb to %s\n", filename.c_str());
-
 	std::vector<int> eidmaphost(_gridlayer[0]->n_elements);
 	gpu_manager_t::download_buf(eidmaphost.data(), _gridlayer[0]->_gbuf.eidmap, sizeof(int) * _gridlayer[0]->n_elements);
 	std::vector<float> rhohost(_gridlayer[0]->n_gselements);
-	gpu_manager_t::download_buf(rhohost.data(), _gridlayer[0]->_gbuf.rho_e, sizeof(float) * _gridlayer[0]->n_gselements);
-
+	gpu_manager_t::download_buf(rhohost.data(), edata, sizeof(float) * _gridlayer[0]->n_gselements);
 	std::vector<int> epos[3];
 	for (int i = 0; i < 3; i++) epos[i].resize(_gridlayer[0]->n_elements);
 
@@ -765,6 +763,17 @@ void HierarchyGrid::writeDensity(const std::string& filename)
 	}
 	
 	openvdb_wrapper_t<float>::grid2openVDBfile(filename, epos, evalue);
+
+}
+
+void HierarchyGrid::writeDensity(const std::string& filename)
+{
+	writeElmentScalar(filename, grids[0]->_gbuf.rho_e);
+}
+
+void grid::HierarchyGrid::writeHeat(const std::string &filename)
+{
+	writeElmentScalar(filename, grids[0]->_gbuf.te);
 }
 
 void grid::HierarchyGrid::writeSurfaceElement(const std::string& filename)
@@ -1587,9 +1596,10 @@ size_t grid::Grid::build(
 
 	// for heat conduction
 	if (enableHeatGrid) {
+		std::cout << "using heat grid" << std::endl;
 		_gbuf.uT = (ScalarT*)gm.add_buf(_name + " uT " , sizeof(ScalarT)* nv_gs);
-		_gbuf.rT = (ScalarT*)gm.add_buf(_name + " uT " , sizeof(ScalarT)* nv_gs);
-		_gbuf.fT = (ScalarT*)gm.add_buf(_name + " uT " , sizeof(ScalarT)* nv_gs);
+		_gbuf.rT = (ScalarT*)gm.add_buf(_name + " rT " , sizeof(ScalarT)* nv_gs);
+		_gbuf.fT = (ScalarT*)gm.add_buf(_name + " fT " , sizeof(ScalarT)* nv_gs);
 	}
 
 	// finest layer
@@ -1601,7 +1611,8 @@ size_t grid::Grid::build(
 
 		// for heat
 		if(enableHeatGrid) {
-			_gbuf.rhoHeat = (float *)gm.add_buf(_name + "heat rho_e ", sizeof(float) * ne_gs);
+			_gbuf.ce = (float *)gm.add_buf(_name + "heat rho_e ", sizeof(float) * ne_gs);
+			_gbuf.te = (float *)gm.add_buf(_name + "heat e temp ", sizeof(float) * ne_gs);
 		}
 	}
 
@@ -1991,7 +2002,7 @@ void Grid::buildHeatCoarsestSystem(void) {
 
 	for (int i = 0; i < rxdata->size(); i++) {
 		for (int j = 0; j < 27; j++) {
-			double rxvalue = rxdata[i][j];
+			double rxvalue = rxdata[j][i];
 			int vid = i;
 			// stencil is stored in row major order
 			int nei = j;
@@ -2123,6 +2134,50 @@ void Grid::solve_fem_host(void)
 	for (int i = 0; i < 3; i++) {
 		gpu_manager_t::upload_buf(_gbuf.U[i], v3host[i].data(), sizeof(double) * n_gsvertices);
 	}
+}
+
+void Grid::solve_heat_fem_host(void)
+{
+	static Eigen::BiCGSTAB<Eigen::SparseMatrix<double>, Eigen::IncompleteLUT<double>> solverhost;
+	//auto& solverhost = svd;
+	//static Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solverhost;
+	static Eigen::Matrix<double, -1, 1> fhost;
+	static std::vector<double> vhost;
+	static Eigen::Matrix<double, -1, 1> uhost;
+
+	int nrow = nvlastrows;
+	// copy data from device to host
+	vhost.resize(n_gsvertices);
+	gpu_manager_t::download_buf(vhost.data(), _gbuf.fT, sizeof(ScalarT) * n_gsvertices);
+	fhost.resize(nrow, 1);
+	for (int i = 0; i < vhost.size(); i++) {
+		if (vlastrowid[i] == -1) continue;
+		fhost[vlastrowid[i]] = vhost[i];
+	}
+
+	//// solve
+	//uhost = solverhost.solve(fhost);
+	uhost = svdT.solve(fhost);
+	// DEBUG
+	eigen2ConnectedMatlab("uhost", uhost);
+	eigen2ConnectedMatlab("fhost", fhost);
+
+	// if preffered solver failed, try alternative solver
+	if (solverhost.info() != Eigen::Success) {
+		printf("-- \033[31mHost solver failed \033[0m\n");
+		uhost.fill(0);
+	}
+
+	// pass solved displacement back to device
+	for (int j = 0; j < n_gsvertices; j++) {
+		int rowid = vlastrowid[j];
+		if (rowid == -1)
+			vhost[j] = 0;
+		else
+			vhost[j] = uhost[rowid];
+	}
+
+	gpu_manager_t::upload_buf(_gbuf.uT, vhost.data(), sizeof(ScalarT) * n_gsvertices);
 }
 
 void Grid::enumerate_gs_subset(

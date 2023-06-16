@@ -320,6 +320,9 @@ void TestSuit::testMain(const std::string& testname)
 	else if (testname == "surfvoxel") {
 		testSurfVoxels();
 	}
+	else if (testname == "heatfem") {
+		testHeatFEM();
+	}
 	else {
 		printf("\033[31mUnknown test\033[0m\n");
 		exit(-1);

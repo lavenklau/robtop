@@ -90,6 +90,14 @@ void solveFEM(void)
 	}
 }
 
+void solveHeatFEM(double rel_tol) {
+	double rel_res = 1;
+	int iter = 0;
+	while (rel_res > rel_tol && iter++ < 20) {
+		rel_res = grids.v_cycle_heat();
+		printf("[Heat] Vit %04d : rel = %.4le\n", iter, rel_res);
+	}
+}
 
 void matlab_utils_test(void) {
 #ifdef ENABLE_MATLAB

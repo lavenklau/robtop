@@ -40,6 +40,11 @@
 	}\
 } while (0)
 
+#define print_exception                                                                            \
+	do                                                                                             \
+	{                                                                                              \
+		printf("\033[31mException occurred at line %d,\n   file %s\033[0m\n", __LINE__, __FILE__); \
+	} while (0)
 
 namespace culib {
 	extern void lib_test(void);

@@ -46,6 +46,10 @@ void selfTest(void);
 
 void solveFEM(void);
 
+void solveHeatFEM(double rel_tol = 1e-4);
+
+void testHeatFEM(void);
+
 // solve the worst-case displacement using the modified power method, return the final compliance
 double modifiedPM(void);
 

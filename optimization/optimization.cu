@@ -9,6 +9,7 @@
 //#include "gpuVector.h"
 
 using namespace culib;
+using namespace grid;
 
 extern  __constant__  double gTemplateMatrix[24][24];
 extern  __constant__ int* gV2E[8];
@@ -33,6 +34,12 @@ extern  __constant__ int* gVflag[1];
 extern  __constant__ int* gEflag[1];
 extern  __constant__ int gLayerid[1];
 extern  __constant__ int gDEBUG[1];
+
+extern __constant__ ScalarT* gT;
+extern __constant__ ScalarT* gFT;
+extern __constant__ ScalarT* gRTfine;
+extern __constant__ ScalarT* gTcoarse;
+extern __constant__ ScalarT* gRT;
 
 extern __constant__ double gHeatMatrix[8][8];
 
@@ -408,4 +415,73 @@ bool checkAdjointVariable(void) {
 	return passCheck;
 }
 
+__global__ void setSinkNodes_kernel(int nv, int* vflags) {
+	size_t vid = blockIdx.x * blockDim.x + threadIdx.x;
+	if(vid >= nv) return;
+	int flag = vflags[vid];
+	if(flag & Grid::mask_supportnodes) {
+		flag = flag | Grid::mask_sink_nodes;
+	}
+	vflags[vid] = flag;
+}
 
+// ToDo : set sink node
+void setSinkNodes(grid::Grid &grid)
+{
+	size_t grid_size, block_size;
+	int nv = grid.n_gsvertices;
+	make_kernel_param(&grid_size, &block_size, grid.n_gsvertices, 512);
+	setSinkNodes_kernel<<<grid_size, block_size>>>(nv, grid._gbuf.vBitflag);
+	cudaDeviceSynchronize();
+	cuda_error_check;
+}
+
+__global__ void averageNodeT_kernel(int nv, int *vflags, ScalarT *telist) {
+	size_t vid = blockIdx.x * blockDim.x + threadIdx.x;
+	if(vid >= nv) return;
+	int vflag = vflags[vid];
+	bool invalid = vflag & Grid::mask_invalid;
+	if(!invalid) return;
+	int eid = gV2E[7][vid];
+	if (eid == -1) return;
+	ScalarT sT = 0;
+	for (int i = 0; i < 8; i++) {
+		int vneioff[3] = {i % 2 + 1, i / 2 % 2 + 1, i / 4 + 1};
+		int vn = vneioff[0] + vneioff[1] * 3 + vneioff[2] * 9;
+		int vnid = gV2V[vn][vid];
+		if(vnid) print_exception;
+		auto vt = gT[vnid];
+		sT += vt;
+	}
+	sT /= 8;
+	telist[eid] = sT;
+}
+
+void averageNodeT(grid::Grid &grid)
+{
+	grid.use_grid();
+	size_t grid_size, block_size;
+	int nv = grid.n_gsvertices;
+	make_kernel_param(&grid_size, &block_size, grid.n_gsvertices, 512);
+	averageNodeT_kernel<<<grid_size, block_size>>>(nv, grid._gbuf.vBitflag, grid._gbuf.te);
+	cudaDeviceSynchronize();
+	cuda_error_check;
+}
+
+void testHeatFEM(void) {
+	auto& grid = *grids[0];
+	grid.use_grid();
+	grid.reset_heat_displacement();
+	grid.reset_heat_force();
+	grid.reset_heat_residual();
+	// init Conductivity
+	init_array(grid._gbuf.ce, 0.5f, grid.n_gselements);
+	// init source
+	init_array(grid._gbuf.fT, 1.f, grid.n_gsvertices);
+	// choose sink nodes
+	setSinkNodes(grid);
+	update_heat_stencil();
+	solveHeatFEM();
+	averageNodeT(grid);
+	grids.writeHeat(grids.getPath("te.vdb"));
+}

@@ -62,11 +62,11 @@ __device__ void loadTemplateMatrix(volatile T KE[8][8]) {
 
 
 template<typename T, int BlockSize = 32 * 13>
-__global__ void gs_relax_heat_kernel(int n_vgstotal, int nv_gsset, devArray_t<T, 27> tstencil, int gs_offset) {
+__global__ void gs_relax_heat_kernel(int n_vgstotal, int nv_gsset, devArray_t<T*, 27> tstencil, int gs_offset) {
 	// GraftArray<double, 27, 9> stencil(rxstencil, n_vgstotal);
     auto& stencil = tstencil;
 	int tid = blockIdx.x*blockDim.x + threadIdx.x;
-	__shared__ double sumAT[1][13][32];
+	__shared__ T sumAT[1][13][32];
 	int warpId = threadIdx.x / 32;
 	int node_id_in_block = threadIdx.x % 32;
 	int workId = node_id_in_block;
@@ -88,7 +88,7 @@ __global__ void gs_relax_heat_kernel(int n_vgstotal, int nv_gsset, devArray_t<T,
 		invalid_node = flag & Grid::Bitmask::mask_invalid;
 		if (invalid_node) goto _blockSum;
 		for (auto i : { 0,14 }) {
-			double uT;
+			T uT;
 			int neigh_th = warpId + i;
 			int neigh = gV2V[neigh_th][node_id];	
 			if (neigh == -1) continue;
@@ -130,8 +130,8 @@ _blockSum:
 	//__syncthreads();
 
 	if (gs_vertex_id < nv_gsset && !invalid_node) {
-		double node_sum = 0;
-        ScalarT uT = 0.; int rowOffset = 0;
+		T node_sum = 0;
+        T uT = 0.; int rowOffset = 0;
         if (warpId == 0) {
 			uT = gT[node_id];
 			uT = (gFT[node_id] - AT) / stencil[13][node_id];
@@ -199,7 +199,7 @@ __global__ void gs_relax_Heat_OTFA_kernel(int nv_gs, int gs_offset, float* rholi
 		int vj_lid = vjpos[0] + vjpos[1] * 3 + vjpos[2] * 9;
 		int vj_vid = gV2V[vj_lid][vid];
 		if (vj_vid == -1) continue;
-        double U = {gT[vj_vid]};
+        ScalarT U = {gT[vj_vid]};
         if (vj_lid != 13) {
             KT += heatRho * KE[vi][vj] * U;
         }
@@ -237,8 +237,6 @@ _blocksum:
 		if (flag & Grid::mask_sink_nodes) newT = 0;
 		gT[vid] = newT; 
 	}
-
-
 }
 
 void Grid::gs_relax_heat(int n_times)
@@ -253,7 +251,7 @@ void Grid::gs_relax_heat(int n_times)
 				constexpr int BlockSize = 32 * 8;
 				size_t grid_size, block_size;
 				make_kernel_param(&grid_size, &block_size, gs_num[i] * 8, BlockSize);
-                gs_relax_Heat_OTFA_kernel<<<grid_size, block_size>>>(gs_num[i], gs_offset, _gbuf.rhoHeat);
+                gs_relax_Heat_OTFA_kernel<<<grid_size, block_size>>>(gs_num[i], gs_offset, _gbuf.ce);
                 cudaDeviceSynchronize();
                 cuda_error_check;
 				gs_offset += gs_num[i];
@@ -287,7 +285,7 @@ void Grid::gs_relax_heat(int n_times)
 
 __global__ void update_heat_residual_OTFA_kernel(int nv, float* rholist) {
 
-	__shared__ double KE[8][8];
+	__shared__ ScalarT KE[8][8];
 
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -309,11 +307,11 @@ __global__ void update_heat_residual_OTFA_kernel(int nv, float* rholist) {
 		}
 	}
 
-	double KT = 0.;
+	ScalarT KT = 0.;
 	for (int i = 0; i < 8; i++) {
 		int eid = gV2E[i][vid];
 		if (eid == -1) continue;
-		double heatRho = rholist[eid];
+		float heatRho = rholist[eid];
 		int vi = 7 - i;
 		for (int vj = 0; vj < 8; vj++) {
 			int vjpos[3] = {
@@ -328,13 +326,13 @@ __global__ void update_heat_residual_OTFA_kernel(int nv, float* rholist) {
 				printf("-- error in update residual otfa\n");
 				continue;
 			}
-			double t = gT[vj_vid];
+			ScalarT t = gT[vj_vid];
 			if (vsink[vj_lid]) { t = 0; }
 			KT += heatRho * KE[vi][vj] * t;
 		}
 	}
 
-	double r = gFT[vid] - KT;
+	ScalarT r = gFT[vid] - KT;
 
 	if (vsink[13]) { r = 0; }
 
@@ -347,11 +345,11 @@ __global__ void update_heat_residual_kernel(int nv, devArray_t<T *, 27> rxstenci
 	if (tid >= nv) return;
 	int vid = tid;
 
-	double KT = { 0. };
+	T KT = { 0. };
 	for (int i = 0; i < 27; i++) {
 		int vj = gV2V[i][vid];
 		if (vj == -1) continue;
-		double t = gT[vj];
+		T t = gT[vj];
 		KT += rxstencil[i][vid] * t;
 	}
 
@@ -363,6 +361,7 @@ __global__ void heatDiffusionStep_kernel(int nv, devArray_t<ScalarT *, 27> st ){
 }
 
 void grid::Grid::heatDiffusionStep(void) {
+	throw std::runtime_error("Not implemented");
 }
 
 void grid::Grid::update_heat_residual(void) {
@@ -372,7 +371,7 @@ void grid::Grid::update_heat_residual(void) {
 	if (_layer == 0)
 	{
 		make_kernel_param(&grid_size, &block_size, n_gsvertices, 256);
-		update_heat_residual_OTFA_kernel<<<grid_size, block_size>>>(n_gsvertices, _gbuf.rhoHeat);
+		update_heat_residual_OTFA_kernel<<<grid_size, block_size>>>(n_gsvertices, _gbuf.ce);
 		cudaDeviceSynchronize();
 		cuda_error_check;
 	}
@@ -622,7 +621,7 @@ double HierarchyGrid::v_cycle_heat(int pre_relax, int post_relax)
 		}
 		else {
 			//_gridlayer[i]->force2matlab("f");
-			_gridlayer[i]->solve_fem_host();
+			_gridlayer[i]->solve_heat_fem_host();
 			//_gridlayer[i]->displacement2matlab("u");
 		}
 	}
@@ -737,13 +736,13 @@ __global__ void restrict_heat_stencil_nondyadic_OTFA_kernel(
 				int vipos[3] = { epos[0] + ki % 2,epos[1] + ki % 4 / 2,epos[2] + ki / 4 };
 				int wipos[3] = { abs(vipos[0] - 4),abs(vipos[1] - 4),abs(vipos[2] - 4) };
 				if (wipos[0] >= 4 || wipos[1] >= 4 || wipos[2] >= 4) continue;
-				double wi = W[wipos[0]][wipos[1]][wipos[2]];
-				double w_ki = wi * heatRho;
+				T wi = W[wipos[0]][wipos[1]][wipos[2]];
+				T w_ki = wi * heatRho;
 
 				// traverse another vertex of neighbor element (cols of element matrix), get the 3x3 Ke and multiply the row weights
 				for (int kj = 0; kj < 8; kj++) {
 					int kjpos[3] = { epos[0] + kj % 2 , epos[1] + kj % 4 / 2 , epos[2] + kj / 4 };
-					double wk = w_ki * KE[ki][kj];
+					T wk = w_ki * KE[ki][kj];
 
 					if (vsink[kj] || vsink[ki]) {
 						wk = 0;
@@ -779,12 +778,12 @@ __global__ void restrict_heat_stencil_dyadic_kernel(
 
 	if (ke_id >= 1) return;
 
-	double coarseStencil[27] = { 0. };
+	T coarseStencil[27] = { 0. };
 
 	int warpid = threadIdx.x / 32;
 	int warptid = threadIdx.x % 32;
 
-	double w[4] = { 1.0,1.0 / 2,1.0 / 4,1.0 / 8 };
+	T w[4] = { 1.0,1.0 / 2,1.0 / 4,1.0 / 8 };
 	for (int i = 0; i < 27; i++) {
 		int neipos[3] = { i % 3 + 1 ,i % 9 / 3 + 1 ,i / 9 + 1 };
 
@@ -792,7 +791,7 @@ __global__ void restrict_heat_stencil_dyadic_kernel(
 
 		if (wneighpos[0] >= 2 || wneighpos[1] >= 2 || wneighpos[2] >= 2) continue;
 
-		double weight = w[wneighpos[0] + wneighpos[1] + wneighpos[2]];
+		T weight = w[wneighpos[0] + wneighpos[1] + wneighpos[2]];
 
 		int vn = gV2Vfine[i][vid];
 
@@ -801,7 +800,7 @@ __global__ void restrict_heat_stencil_dyadic_kernel(
 		// traverse fine stencil component (each neighbor vertex has a component)
 		for (int j = 0; j < 27; j++) {
 
-			double kij = rxFine[j][vn] * weight;
+			T kij = rxFine[j][vn] * weight;
 
 			// DEBUG
 			if (gVfine2Vfine[j][vn] == -1) { if (kij != 0) { printf("-- error on stencil 1\n"); } continue; }
@@ -813,7 +812,7 @@ __global__ void restrict_heat_stencil_dyadic_kernel(
 				int vsplitpos[3] = { vsplit % 3 * 2, vsplit % 9 / 3 * 2, vsplit / 9 * 2 };
 				int wsplitpos[3] = { abs(vsplitpos[0] - vjpos[0]), abs(vsplitpos[1] - vjpos[1]), abs(vsplitpos[2] - vjpos[2]) };
 				if (wsplitpos[0] >= 2 || wsplitpos[1] >= 2 || wsplitpos[2] >= 2) continue;
-				double wsplit = w[wsplitpos[0] + wsplitpos[1] + wsplitpos[2]];
+				T wsplit = w[wsplitpos[0] + wsplitpos[1] + wsplitpos[2]];
 				coarseStencil[vsplit] += wsplit * kij;
 			}
 		}
@@ -835,7 +834,7 @@ void grid::HierarchyGrid::restrict_heat_stencil(grid::Grid &dstcoarse, grid::Gri
 		size_t grid_size, block_size;
 		make_kernel_param(&grid_size, &block_size, dstcoarse.n_gsvertices, 256);
 		restrict_heat_stencil_nondyadic_OTFA_kernel<<<grid_size, block_size>>>(
-			dstcoarse.n_gsvertices, coarseStencil, srcfine.n_gsvertices, srcfine._gbuf.rhoHeat, srcfine._gbuf.vBitflag, ScalarT(1.));
+			dstcoarse.n_gsvertices, coarseStencil, srcfine.n_gsvertices, srcfine._gbuf.ce, srcfine._gbuf.vBitflag, ScalarT(1.));
 		cudaDeviceSynchronize();
 		cuda_error_check;
 	}

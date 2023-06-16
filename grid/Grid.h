@@ -234,7 +234,8 @@ namespace grid {
 			ScalarT* fT;
 			ScalarT* rT;
 
-			float* rhoHeat;
+			float* ce; // thermal conductivity
+			float* te; // element temperature
 			ScalarT* tStencil[27];
 		} _gbuf;
 
@@ -478,6 +479,8 @@ namespace grid {
 
 		void solve_fem_host(void);
 
+		void solve_heat_fem_host(void);
+
 		void buildCoarsestSystem(void);
 
 		void buildHeatCoarsestSystem(void);
@@ -684,6 +687,10 @@ namespace grid {
 		void writeV2V(const std::string& filename, Grid& g);
 
 		void writeDensity(const std::string& filename);
+
+		void writeElmentScalar(const std::string& filename, float* edata);
+
+		void writeHeat(const std::string& filename);
 
 		void readDensity(const std::string& filename);
 

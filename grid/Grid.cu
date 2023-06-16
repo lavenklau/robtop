@@ -71,13 +71,19 @@ void Grid::use_grid(void)
 	cudaMemcpyToSymbol(gEflag, &_gbuf.eBitflag, sizeof(gEflag));
 	cudaMemcpyToSymbol(gLayerid, &_layer, sizeof(gLayerid));
 
+	cudaMemcpyToSymbol(gT, &_gbuf.uT, sizeof(gT));
+	cudaMemcpyToSymbol(gRT, &_gbuf.rT, sizeof(gRT));
+	cudaMemcpyToSymbol(gFT, &_gbuf.fT, sizeof(gFT));
+
 	if (fineGrid != nullptr) {
 		cudaMemcpyToSymbol(gVfine2Vfine, fineGrid->_gbuf.v2v, sizeof(gVfine2Vfine));
 		cudaMemcpyToSymbol(gVfine2Efine, fineGrid->_gbuf.v2e, sizeof(gVfine2Efine));
 		cudaMemcpyToSymbol(gRfine, fineGrid->_gbuf.R, sizeof(gRfine));
+		cudaMemcpyToSymbol(gRTfine, &fineGrid->_gbuf.rT, sizeof(gRTfine));
 	}
 	if (coarseGrid != nullptr) {
 		cudaMemcpyToSymbol(gUcoarse, coarseGrid->_gbuf.U, sizeof(gUcoarse));
+		cudaMemcpyToSymbol(gTcoarse, &coarseGrid->_gbuf.uT, sizeof(gTcoarse));
 	}
 	//cudaDeviceSynchronize();
 	cuda_error_check;
