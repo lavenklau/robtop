@@ -441,7 +441,7 @@ __global__ void averageNodeT_kernel(int nv, int *vflags, ScalarT *telist) {
 	if(vid >= nv) return;
 	int vflag = vflags[vid];
 	bool invalid = vflag & Grid::mask_invalid;
-	if(!invalid) return;
+	if(invalid) return;
 	int eid = gV2E[7][vid];
 	if (eid == -1) return;
 	ScalarT sT = 0;
@@ -449,7 +449,7 @@ __global__ void averageNodeT_kernel(int nv, int *vflags, ScalarT *telist) {
 		int vneioff[3] = {i % 2 + 1, i / 2 % 2 + 1, i / 4 + 1};
 		int vn = vneioff[0] + vneioff[1] * 3 + vneioff[2] * 9;
 		int vnid = gV2V[vn][vid];
-		if(vnid) print_exception;
+		if (vnid == -1) print_exception;
 		auto vt = gT[vnid];
 		sT += vt;
 	}

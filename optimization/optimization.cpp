@@ -54,9 +54,9 @@ void setOutpurDir(const std::string& dirname)
 	std::string outdir = dirname;
 
 	char lastChar = *outdir.rbegin();
-	if (lastChar != '\\' && lastChar != '/') {
-		outdir.push_back('\\');
-	}
+	// if (lastChar != '\\' && lastChar != '/') {
+	// 	outdir.push_back('\\');
+	// }
 	std::cout << "\033[32m-- Output path \033[0m \n  " << outdir << "\033[0m" << std::endl;
 
 	grids.setOutPath(outdir);

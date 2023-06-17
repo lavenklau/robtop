@@ -10,6 +10,7 @@
 #include "openvdb_wrapper_t.h"
 #include "tictoc.h"
 #include <set>
+#include <filesystem>
 
 using namespace grid;
 
@@ -2278,4 +2279,10 @@ void HierarchyGrid::update_heat_stencil(void) {
 			_gridlayer[i]->reset_heat_residual();
 		}
 	}
+}
+
+std::string HierarchyGrid::getPath(const std::string &nfile) {
+	using path = std::filesystem::path;
+	path outdir(_outdir);
+	return (outdir / nfile).string(); 
 }

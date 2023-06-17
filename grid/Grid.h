@@ -620,7 +620,7 @@ namespace grid {
 
 		void setOutPath(const std::string& outpath) { _outdir = outpath; Grid::_outdir = outpath; }
 
-		std::string getPath(const std::string& nfile) { return _outdir + nfile; }
+		std::string getPath(const std::string& nfile);
 
 		bool isForceFree(void) { return _mode == no_support_free_force || _mode == with_support_free_force; }
 
